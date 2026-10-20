@@ -17,7 +17,7 @@ check("导出 apply/inject/name/Config",
 check("插件名 = dsh-preset-memory", PLUGIN_NAME === "dsh-preset-memory", PLUGIN_NAME);
 
 // 3. 默认配置关键字段
-check("默认 enabled=true", DEFAULTS.enabled === true);
+check("默认 enabled=false（bundle 形态装完不遮蔽）", DEFAULTS.enabled === false);
 check("默认 autoShadow=true", DEFAULTS.autoShadow === true);
 check("默认 shadowSections 含 memory:snapshot", DEFAULTS.shadowSections.includes("memory:snapshot"));
 check("默认 shadowSections 含 prompt:injections", DEFAULTS.shadowSections.includes("prompt:injections"));
@@ -49,7 +49,7 @@ const fakeCtx = {
 		},
 	},
 };
-apply(fakeCtx, {});
+apply(fakeCtx, { enabled: true });
 check("apply 跑通无异常", calls.effects.length > 0, `${calls.effects.length} 个 effect`);
 check("注册了 shadowEmptyContext memory:snapshot", calls.effects.some((t) => t.includes("memory:snapshot")));
 check("注册了 shadow diagnose tool", calls.tools.includes("shadow_diagnose"));
@@ -67,6 +67,18 @@ const fakeCtx2 = {
 apply(fakeCtx2, { enabled: false });
 check("enabled=false 时不注册遮蔽 effect", !calls2.effects.some((t) => t.includes("shadow section") || t.includes("shadow tool")), `${calls2.effects.length} 个 effect`);
 check("enabled=false 时仍注册 diagnose", calls2.tools.includes("shadow_diagnose"));
+
+// 7. 空 config（bundle 形态默认）不遮蔽：只注册 diagnose，不注册遮蔽 effect
+const calls3 = { effects: [], tools: [] };
+const fakeCtx3 = {
+	logger: { info: () => {}, warn: () => {} },
+	effect: (fn, tag) => { calls3.effects.push(tag); try { fn(); } catch (e) {} },
+	tools: { register: (t) => calls3.tools.push(t.name || t) },
+	systemPrompt: { context: () => {} },
+};
+apply(fakeCtx3, {});
+check("空 config 默认不遮蔽（bundle 形态装完安全）", calls3.effects.length === 1 && calls3.effects[0].includes("diagnose"), `${calls3.effects.length} 个 effect`);
+check("空 config 仍注册 diagnose", calls3.tools.includes("shadow_diagnose"));
 
 // 总结
 const failed = results.filter((r) => !r.ok);
