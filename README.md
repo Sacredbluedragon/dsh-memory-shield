@@ -6,7 +6,7 @@ DSH preset 级**记忆遮蔽**工具集。一个 GitHub repo，两个独立 npm 
 
 | 包名 | 定位 | 状态 |
 |---|---|---|
-| [`dsh-preset-memory`](./packages/shield/) | **纯遮蔽器** | ✅ 已发布 0.1.0（GitHub + npm）。挡住其他记忆插件往这个 preset 注入，让会话上下文干净。不自带记忆存储/写入/管理。 |
+| [`dsh-preset-memory`](./packages/shield/) | **纯遮蔽器** | ✅ 已发布 0.1.1（GitHub + npm）。挡住其他记忆插件往这个 preset 注入，让会话上下文干净。不自带记忆存储/写入/管理。默认关闭，装进 profile 不影响任何会话，只在目标 preset 里显式开。 |
 | [`dsh-preset-memory-memory`](./packages/memory-companion/) | **遮蔽会话记忆 companion** | 🚧 开发中，v0.2 计划。给遮蔽会话加上三轨/五轨记忆（存储层参考 [dsh-memory-evolve](https://github.com/csyangwen/dsh-memory-evolve)，作者 csyangwen）。当前只有 lib/ 与 manage.html，无入口文件，不能安装。 |
 
 ## 用户怎么选
@@ -17,7 +17,7 @@ DSH preset 级**记忆遮蔽**工具集。一个 GitHub repo，两个独立 npm 
 
 ## 设计原则
 
-1. **默认纯遮蔽**：从 market / npm 下载后不注册任何记忆工具、不注入任何记忆上下文。
+1. **默认关闭**：bundle 形态装进 profile 后不注册任何遮蔽（`enabled: false`），只在目标 preset 里显式开 `enabled: true` 才生效。
 2. **平行世界隔离**：遮蔽会话的记忆和普通会话的记忆插件互不可见、互不可管。
 3. **可逆**：把插件从 preset 的 `plugins:` 里删掉，全局记忆插件立刻恢复。
 
