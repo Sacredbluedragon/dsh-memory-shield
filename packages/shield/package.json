@@ -1,6 +1,6 @@
 {
   "name": "dsh-preset-memory",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Universal memory shadow plugin for DSH: shadows other memory plugins' context and tools within a preset, giving that channel a clean context.",
   "type": "module",
   "main": "./index.js",
@@ -34,10 +34,16 @@
   "files": [
     "index.js",
     "lib/",
+    "cordis.patch.yml",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
   ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
   "peerDependencies": {
     "@deepseek-ai/schemastery": "^3.18.4"
   }
