@@ -1,0 +1,10 @@
+{
+  "name": "dsh-preset-memory-companion",
+  "version": "0.0.0",
+  "private": true,
+  "description": "开发中：给 DSH preset 遮蔽会话加记忆的 companion 包，入口未完成，不发布。",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  }
+}

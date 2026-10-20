@@ -1,0 +1,44 @@
+{
+  "name": "dsh-preset-memory",
+  "version": "0.1.0",
+  "description": "Universal memory shadow plugin for DSH: shadows other memory plugins' context and tools within a preset, giving that channel a clean context.",
+  "type": "module",
+  "main": "./index.js",
+  "license": "MIT",
+  "author": "Sacredbluedragon",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "preset",
+    "memory",
+    "shadow",
+    "shim"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sacredbluedragon/dsh-preset-memory.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Sacredbluedragon/dsh-preset-memory/issues"
+  },
+  "homepage": "https://github.com/Sacredbluedragon/dsh-preset-memory#readme",
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.2.0-rc.1 <0.3.0-0"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "lib/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "^3.18.4"
+  }
+}
