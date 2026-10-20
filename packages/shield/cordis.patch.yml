@@ -1,0 +1,6 @@
+# dsh bundle patch: 插入本插件但不启用（默认关闭），装完不影响任何会话。
+# 要用于某个 preset：在该 preset 的 plugins 里显式挂载本包，并设 config.enabled: true。
+- insert:
+    - id: preset-memory
+      name: 'dsh-preset-memory'
+      disabled: true
