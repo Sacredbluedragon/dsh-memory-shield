@@ -2,6 +2,13 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 格式。
 
+## [0.1.1] - 2026-10-20
+
+### Changed
+- 改为 bundle 形态：`package.json` 声明 `dsh.bundle.patch`，包内附 `cordis.patch.yml`
+- 默认 `enabled: false`：装进 profile 后不遮蔽任何会话，只在目标 preset 里显式开 `enabled: true` 才生效
+- 修复误用风险：市场里把安装行切到启用时，插件自身默认仍是关闭，只注册只读诊断工具
+
 ## [0.1.0] - 2026-10-20
 
 ### Added
