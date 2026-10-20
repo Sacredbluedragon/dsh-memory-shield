@@ -4,13 +4,13 @@
 
 在指定 preset 内遮蔽其他记忆插件的注入和工具，让这个通道拥有干净的上下文。
 
-![version](https://img.shields.io/badge/version-0.1.0-blue)
+![version](https://img.shields.io/badge/version-0.1.1-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 > **插件信息**
 > - **名字**：dsh-preset-memory
 > - **定位**：DSH preset 级记忆遮蔽器——挡住其他记忆插件往这个 preset 里注入
-> - **默认状态**：纯遮蔽器（无记忆）。从 DSH market / npm 下载后默认只启用遮蔽功能，不注册任何记忆工具、不注入任何记忆上下文。
+> - **默认状态**：bundle 形态装进 profile 后默认关闭（`enabled: false`），不遮蔽任何会话；在目标 preset 里显式写 `config.enabled: true` 才生效。
 > - **遮蔽范围**：默认覆盖 DSH 生态下载量前 8 的记忆插件（prime-memory / memory-eternal / meow-memory / memento / auto-memory / memory-palace / memoir 等）
 > - **已知限制**：挡不住 pre-step user message 注入（openviking-memory 等）和消息级注入（meow-memory）
 
@@ -68,17 +68,31 @@ surface prompt 一起灭掉。所以只能走同名遮蔽。
 
 ## 安装
 
+**bundle 形态，装进 profile 也默认关闭，不影响任何会话。**
+
 ```bash
 dsh plugin --profile web add dsh-preset-memory
 ```
 
-> 注：`npm install dsh-preset-memory` 只装文件，不注册到 DSH profile；用上面的命令才会真正加载。注册时看到 `declares no dsh.bundle — installed as a plain dependency` 属正常。
+装完是「已安装、未启用」：包里 `cordis.patch.yml` 那行带 `disabled: true`，插件不会被 apply，任何会话都不遮蔽。
 
-**只进 preset，不进全局：** 这个插件只挂在目标 preset 的 `plugins:` 里，不要进 `dsh.profile.bundles` 也不要进全局 `cordis.patch.yml`——否则 10 个空 context + 21 个死工具会对全部会话生效，与全局记忆插件撞名会抛 `prompt context "memory:snapshot" is already registered`。
+**在目标 preset 里启用**（这才是它的用法）：
+
+```yaml
+# 目标 preset 的 plugins 里加一项
+- id: preset-memory
+  name: 'dsh-preset-memory'
+  config:
+    enabled: true
+```
+
+**为什么默认关**：它靠按作用域同名遮蔽工作。如果在 profile 层全局启用，10 个空 context + 21 个死工具会对**每个**会话生效，还会和全局记忆插件撞名抛 `prompt context "memory:snapshot" is already registered`。默认关 + 只在 preset 里开，这个事故就不会发生。
+
+**市场里误点「启用」会怎样**：profile 那行变成启用，但插件自身 `enabled` 默认仍是 false，所以只会注册一个只读诊断工具 `shadow_diagnose`，不会遮蔽。要真正全局遮蔽，得连 `enabled` 一起改成 true——不推荐。
 
 **反向成本：** 21 个空壳工具常驻工具表，每回合多几百 token。如果你只遮蔽 1-2 个记忆插件，可以把 `autoShadow: false` 关掉，手动配 `shadowTools` / `shadowSections`。
 
-**本包不申请 awesome-dsh-plugin 收录**（无 dsh.bundle、根无 cordis.patch.yml，硬闸过不去）。
+本包具备市场收录形态（`dsh.bundle` + `cordis.patch.yml`），收录后按上面的默认关闭方式安装。
 
 ## 快速开始
 
