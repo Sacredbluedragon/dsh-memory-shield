@@ -25,7 +25,7 @@ const ALLOWED_EXACT = new Set([
  */
 export const SHADOW_HINT =
 	"本会话已启用记忆遮蔽：其他记忆插件注入的记忆已被拦截（数据未删除）。" +
-	"如需隔离记忆，请安装 dsh-memory-core（companion 包）。";
+	"配套的 dsh-memory-core 尚未发布，当前无法安装。";
 
 export function isMemorySection(name) {
 	return ALLOWED_EXACT.has(name) || ALLOWED_PREFIXES.some((p) => name.startsWith(p));
