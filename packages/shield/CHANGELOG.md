@@ -2,7 +2,20 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 格式。
 
+## [0.1.9] - 2026-10-21
+
+### Fixed
+- `/health` 的 `presetName` 与 `/state` 同口径：profile 层返回空串，不再把「装了没挂」误报成「挂在 default」。
+- `SHADOW_HINT` 改成陈述句（配套包尚未发布、当前不可安装），不再与「不要安装 companion」的提示词互相矛盾。
+- 「帮我启用」提示词：presetName 以 `/state` 为准、先确认目标 preset 存在、备份落到原文件同目录（不再要求中文目录 `备份\`）。
+- 「了解这个插件」不再写死 Windows 的 `%USERPROFILE%` 与 `web` profile 名。
+
+### Changed
+- `package.json`：版本 0.1.9；`dsh.client` 补 `inject`；keywords 去掉 `preset`。
+- README 版本徽章同步到 0.1.9。
+
 ## [0.1.8] - 2026-10-21
+
 
 ### Changed
 - 四段「复制给 agent」的提示词按独立审核重写：
