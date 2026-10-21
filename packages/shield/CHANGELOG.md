@@ -2,6 +2,19 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 格式。
 
+## [0.1.8] - 2026-10-21
+
+### Changed
+- 四段「复制给 agent」的提示词按独立审核重写：
+  - 「了解这个插件」给出 README 的真实路径（`%USERPROFILE%\.dsh\profiles\web\node_modules\dsh-memory-shield\README.md`）与「搜不到别猜」的兜底；
+  - 「帮我启用」写明 preset 的 config 是整体替换（不能新写同名块）、不要加到 `dsh.profile.bundles` 或 profile 层、默认复用现有 preset、不要自己重启；
+  - 「查看遮蔽状态」先试 `shadow_diagnose`，报 unknown tool 时改走 `/state` 与 `/health`，并说明两个数口径不同；
+  - 「了解配套记忆包」不再指向尚未发布的包，明确禁止安装或 npm 搜装。
+- 「不想手改」那行从「第一条」改成「第二条（帮我启用）」；按钮标签「了解 companion 包」改「了解配套记忆包」。
+
+### Fixed
+- `/api/memory-shield/state` 补 `presetName`，面板「作用范围」不再显示 `preset「(未命名)」`。
+
 ## [0.1.7] - 2026-10-21
 
 ### Changed
