@@ -29,6 +29,7 @@ window.__ModuleLoader__.load({
     const COPY_UNDERSTAND = '我刚安装了 dsh-memory-shield，帮我读一下 node_modules/dsh-memory-shield/README.md，理解后用通俗语言告诉我这个插件是干什么的、怎么用。不要帮我改配置。'
     const COPY_COMPANION = '我刚安装了 dsh-memory-shield，想知道 companion 包 dsh-memory-core 是什么。帮我读一下它的 README，用通俗语言告诉我它和 shield 的关系。不要帮我安装或改配置。'
     const COPY_DIAGNOSE = '帮我调用 shadow_diagnose 工具，看看当前遮蔽状态，然后告诉我这个状态意味着什么。不要帮我改任何配置。'
+    const COPY_HELP = '我不太懂 dsh-memory-shield 这个记忆遮蔽插件。请帮我：①访问 /api/memory-shield/state 和 /health，告诉我它装没装、在哪个 preset 里生效；②用通俗的话说明它现在影响哪些会话；③如果我想启用，告诉我具体要改哪个文件的哪一行（先说清楚、不要直接改，我同意再动）。'
     const COPY_HINT = '复制后粘贴到对话框，发给 agent。'
 
     const jget = async (p) => {
@@ -96,8 +97,7 @@ function CopyButton(props) {
         h('div', { 'data-ms-row': '' },
           h('button', { 'data-ms-btn': '', onClick }, props.label),
           status === 'ok' ? h('span', { 'data-ms-copy-ok': '' }, '已复制') : null,
-          status === 'fail' ? h('span', { 'data-ms-copy-fail': '' }, '复制失败') : null),
-        h('div', { 'data-ms-note': '' }, COPY_HINT))
+          status === 'fail' ? h('span', { 'data-ms-copy-fail': '' }, '复制失败') : null))
     }
 
     // ── 共享状态源 ────────────────────────────────────────────────────────
@@ -161,9 +161,13 @@ function CopyButton(props) {
     }
 
     // 状态面板（插件详情页 + 设置页共用）
-    function Panel() {
+    function Panel(props) {
       const { state: st, loading, error, reload } = useShieldState()
       const [msg, setMsg] = React.useState('')
+
+      // 只有「设置页那一份」受 showInSettings 控制；插件详情页（plugins.bundle.config）始终保留。
+      // 只在拿到状态后判断，避免首帧闪一下再消失。
+      if (props && props.inSettings === true && st && st.showInSettings === false) return null
 
       const errLine = error
         ? h('div', { 'data-ms-note': '', style: { color: '#c0392b' } },
@@ -184,43 +188,65 @@ function CopyButton(props) {
       return h('div', { 'data-ms-page': '' },
         h('div', { 'data-ms-title': '' }, '记忆遮蔽插件'),
         h('div', { 'data-ms-sub': '' },
-          st.enabled
-            ? '当前状态：已启用（本会话的记忆类上下文与工具已被遮蔽）。'
-            : '当前状态：未启用。在目标 preset 的 plugins 列表加入 dsh-memory-shield，并在 config 里设 enabled: true。'),
-        // 说明段：放在面板最上方、状态之下，给不看文档的人看
+          st.enabled ? '当前状态：已启用' : '当前状态：未启用'),
+        // 说明段：给不看文档的人看（口语，不写术语）
         h('div', { 'data-ms-explain': '' },
           h('div', { 'data-ms-explain-line': '' },
-            '这个插件会让当前会话不加载其他记忆插件注入的记忆内容。'),
+            '它是干什么的：让挂着它的那个 preset 下的会话看不到记忆库（记忆数据不会删，只是不读）。'),
           h('div', { 'data-ms-explain-line': '' },
-            '它不会删除任何记忆数据，只是在这个会话里暂不注入。'),
+            '会影响谁：只影响挂着它的 preset；其他会话照旧。'),
           h('div', { 'data-ms-explain-line': '' },
-            '想在这个会话里有自己的记忆，装 companion 包 dsh-memory-core。'),
+            '什么时候用：想让某个窗口或通道不带记忆时用，比如给别人演示、或者要保持干净的服务窗口。'),
           h('div', { 'data-ms-explain-line': '' },
-            '启用方式：在目标 preset 的 plugins 里加 dsh-memory-shield，config 里设 enabled: true，然后新建会话。')),
-        
+            '想在这些会话里有自己的记忆：再装 companion 包 dsh-memory-core（开发中，暂未发布）。')),
+
         h('div', { 'data-ms-sec': '' },
           h('span', { 'data-ms-sec-title': '' }, '状态'),
           h('div', { 'data-ms-row': '' },
             h('span', null, '启用状态：'),
-            h('span', { 'data-ms-badge': st.enabled ? 'on' : 'off' }, st.enabled ? '已启用' : '未启用'))),
+            h('span', { 'data-ms-badge': st.enabled ? 'on' : 'off' }, st.enabled ? '已启用' : '未启用')),
+          h('div', { 'data-ms-note': '' },
+            '作用范围：' + (st.layer === 'preset'
+              ? 'preset「' + (st.presetName || '(未命名)') + '」下的会话'
+              : '还没挂到任何 preset（当前只在插件目录里）'))),
         errLine,
         h('div', { 'data-ms-sec': '' },
           h('span', { 'data-ms-sec-title': '' }, '怎么启用'),
           h('div', { 'data-ms-note': '' },
-            '1. 在你的 preset 配置里，plugins 列表加入 dsh-memory-shield',
-          ),
+            '1. 打开「Agent 预设」，找到要用的 preset，在它的插件列表里加 dsh-memory-shield'),
           h('div', { 'data-ms-note': '' },
-            '2. config 里设 enabled: true',
-          ),
+            '2. 在这个插件的配置里打开 enabled'),
           h('div', { 'data-ms-note': '' },
-            '3. 重启该 preset 的会话',
-          )),
-        // 三个引导型复制按钮：复制的是「让 agent 读懂并汇报」的提示词
+            '3. 保存后新建一个该 preset 的会话（老会话不受影响）'),
+          h('div', { 'data-ms-note': '' },
+            '不想手改：复制下面第一条提示词发给 agent，让它带你做。')),
+        // 引导型复制按钮：复制的是「让 agent 读懂并汇报 / 帮你操作」的提示词
         h('div', { 'data-ms-sec': '' },
-          h('span', { 'data-ms-sec-title': '' }, '看不懂？让 agent 讲给你听'),
+          h('span', { 'data-ms-sec-title': '' }, '看不懂？复制一条发给 agent'),
+          h('div', { 'data-ms-note': '' }, COPY_HINT),
+          h(CopyButton, { label: '帮我启用或排查', text: COPY_HELP }),
           h(CopyButton, { label: '了解这个插件', text: COPY_UNDERSTAND }),
           h(CopyButton, { label: '了解 companion 包', text: COPY_COMPANION }),
           h(CopyButton, { label: '查看遮蔽状态', text: COPY_DIAGNOSE })),
+        h('div', { 'data-ms-sec': '' },
+          h('span', { 'data-ms-sec-title': '' }, '显示'),
+          h('label', { 'data-ms-row': '', style: { cursor: 'pointer' } },
+            h('input', {
+              type: 'checkbox',
+              checked: st.showInSettings !== false,
+              onChange: async (e) => {
+                const v = !!e.target.checked
+                try {
+                  await jpost('/config', { showInSettings: v })
+                  try { window.__memoryShieldSyncSettings && window.__memoryShieldSyncSettings(v) } catch {}
+                  setMsg(v ? '已在设置页显示' : '已从设置页隐藏（插件详情页这块始终保留）')
+                  reload()
+                } catch (err) {
+                  setMsg('保存失败：' + (err?.message || err))
+                }
+              },
+            }),
+            h('span', { style: { marginLeft: '6px' } }, '在设置页也显示这个面板'))),
         msg ? h('div', { 'data-ms-note': '', style: { color: '#3c9a5f' } }, msg) : null,
       )
     }
@@ -237,7 +263,7 @@ function CopyButton(props) {
 
       return h('div', { 'data-ms-overlay': '' },
         h('span', { 'data-ms-overlay-text': '' },
-          '记忆遮蔽插件已安装，但默认不启用。启用后它会挡住其他记忆插件往当前会话注入的上下文与工具，让这个通道保持干净，所以默认关闭。启用方式：在目标 preset 的 plugins 列表加入 dsh-memory-shield，并在 config 里设 enabled: true。'),
+          '记忆遮蔽插件已安装，但默认不启用。启用后它会挡住其他记忆插件往挂了它的 preset 下的会话注入的上下文与工具，让这些会话保持干净，所以默认关闭。启用方式：在目标 preset 的 plugins 列表加入 dsh-memory-shield，并在 config 里设 enabled: true。'),
         h('button', { 'data-ms-btn': '', onClick: () => setDismissed(true) }, '×'),
         h('button', { 'data-ms-btn': '', onClick: async () => {
           try {
@@ -254,12 +280,13 @@ function CopyButton(props) {
     // 详情页标签（plugins.detail.badge）
     function DetailBadge() {
       const { state, loading, error } = useShieldState()
-      const on = !!(state && state.enabled === true)
       const unknown = !loading && (!!error || !state)
-      const label = loading ? '读取中…' : unknown ? '状态未知' : on ? '全局已启用' : '全局未启用'
+      // profile 层实例的 enabled 恒为 false（遮蔽发生在 preset 层），直接用它做标签会永远显示「未启用」。
+      // 所以这里只报「已安装 / 状态未知」，具体启用状态在设置页面板里看。
+      const label = loading ? '读取中…' : unknown ? '状态未知' : '已安装'
       return h('span', {
-        'data-ms-badge': on ? 'on' : 'off',
-        title: unknown ? '状态加载失败：' + (error || '无返回') : undefined,
+        'data-ms-badge': unknown ? 'off' : 'on',
+        title: unknown ? '状态加载失败：' + (error || '无返回') : '遮蔽在目标 preset 中配置（设置页面板有说明）',
       }, label)
     }
 
@@ -293,17 +320,28 @@ function CopyButton(props) {
           DetailBadge,
         ))
 
-        // ④ 设置页双面板（读 showInSettings 决定是否注册）
-        // 与组件共用 fetchState()，同一时刻不会多发一次 /state
-        fetchState(false).then((st) => {
-          if (!st || st.showInSettings === false) return
-          slots.inject('settings.section', () => slots.register(
-            { name: 'settings.section', id: PKG, label: '记忆遮蔽' },
-            Panel,
-          ))
-        }).catch((e) => {
-          console.warn(TAG, 'settings.section 未注册（/state 不可用）：', e?.message || e)
-        })
+        // ④ 设置页双面板：注册/注销跟着 showInSettings 走。
+        //    组件返回 null 删不掉左侧 tab，必须拿 register 返回的 dispose 手动注销。
+        let settingsReg = null
+        const syncSettings = (on) => {
+          if (on) {
+            if (settingsReg) return
+            slots.inject('settings.section', () => {
+              settingsReg = slots.register(
+                { name: 'settings.section', id: PKG, order: 40, label: '记忆遮蔽' },
+                (props) => h(Panel, Object.assign({}, props || {}, { inSettings: true })),
+              )
+              return settingsReg
+            })
+          } else if (settingsReg) {
+            try { settingsReg() } catch {}
+            settingsReg = null
+          }
+        }
+        try { window.__memoryShieldSyncSettings = syncSettings } catch {}
+        fetchState(false)
+          .then((st) => syncSettings(!!(st && st.showInSettings !== false)))
+          .catch(() => {})
       },
     }
   },
