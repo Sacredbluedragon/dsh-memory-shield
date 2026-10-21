@@ -26,10 +26,10 @@ window.__ModuleLoader__.load({
     const TAG = '[memory-shield]'
 
 // 三段「引导型」提示词：只让 agent 读懂并汇报，明确禁止代改配置。
-    const COPY_UNDERSTAND = '我刚安装了 dsh-memory-shield，帮我读一下 node_modules/dsh-memory-shield/README.md，理解后用通俗语言告诉我这个插件是干什么的、怎么用。不要帮我改配置。'
-    const COPY_COMPANION = '我刚安装了 dsh-memory-shield，想知道 companion 包 dsh-memory-core 是什么。帮我读一下它的 README，用通俗语言告诉我它和 shield 的关系。不要帮我安装或改配置。'
-    const COPY_DIAGNOSE = '帮我调用 shadow_diagnose 工具，看看当前遮蔽状态，然后告诉我这个状态意味着什么。不要帮我改任何配置。'
-    const COPY_HELP = '我不太懂 dsh-memory-shield 这个记忆遮蔽插件。请帮我：①访问 /api/memory-shield/state 和 /health，告诉我它装没装、在哪个 preset 里生效；②用通俗的话说明它现在影响哪些会话；③如果我想启用，告诉我具体要改哪个文件的哪一行（先说清楚、不要直接改，我同意再动）。'
+    const COPY_UNDERSTAND = '我刚装了 dsh-memory-shield，帮我读它的 README 再告诉我它是干什么的、怎么用。README 在 DSH profile 的 node_modules 里（web profile 一般是 %USERPROFILE%\\.dsh\\profiles\\web\\node_modules\\dsh-memory-shield\\README.md），路径不对就用文件名搜一下，别猜。用通俗语言讲三点：它遮蔽了什么、只影响哪些会话、默认为什么是关的。不要帮我改配置。'
+    const COPY_COMPANION = 'dsh-memory-shield 有个配套包 dsh-memory-core，我想知道它是干什么的。它目前还没发布，不要安装、也不要 npm 搜包安装：如果本机没有它的源码目录，就直接按 dsh-memory-shield README 里提到它的地方，用一句话告诉我它和 shield 是什么关系、我什么时候才需要它。不要帮我装东西或改配置。'
+    const COPY_DIAGNOSE = '帮我看看记忆遮蔽现在是什么状态。先试调用 shadow_diagnose 工具；如果它不存在（报 unknown tool），说明当前会话没挂 dsh-memory-shield，就改用只读接口 http://127.0.0.1:3080/api/memory-shield/state 和 /health 看（端口不对就用浏览器地址栏那个端口），再把两边对不上的地方说清楚。并说明这是哪一层看的、这个会话本身是不是被遮蔽的通道。两个来源的数字口径不同（工具报配置数组长度、/health 报去重后的实际生效数），不要当成不一致。然后用一句话告诉我这个状态意味着什么、我下一步要不要启用。不要帮我改任何配置。'
+    const COPY_HELP = '我不太懂 dsh-memory-shield 这个记忆遮蔽插件，想用它。请分步带我，先只做只读检查，等我明确确认后再动手：①用 GET 查 http://127.0.0.1:3080/api/memory-shield/state 和 /health（端口不对就用浏览器地址栏那个），告诉我它现在装在哪一层、有没有启用、挂在哪个 preset（presetName 看 /health）；②告诉我启用要改哪个文件、改在哪儿：必须是在已有 preset 的 plugins 列表里插一项 - id: memory-shield / name: dsh-memory-shield / config: {enabled: true}，不要新写一个同名 preset 块（preset 的 config 是整体替换，会把其余插件清掉），也不要加到 dsh.profile.bundles 或 profile 层（会和全局记忆插件撞名）；顺便说清影响：只有那个 preset 下的会话看不到记忆、其他会话照旧、消息级注入挡不住、要重启并新建该 preset 的会话才生效；③默认复用现成的 preset，遮蔽名单用默认的就行（已覆盖常见记忆插件），只有我装了名单外的插件时才问我；④我确认后再动手：改前把 cordis.patch.yml 备份到 备份\\ 带时间戳，只改这一处，改完把「改了哪个文件+备份在哪+重启方式（不要自己重启，会把当前会话掐掉）+新建哪个会话+进去后怎么验证」列给我。'
     const COPY_HINT = '复制后粘贴到对话框，发给 agent。'
 
     const jget = async (p) => {
@@ -219,15 +219,15 @@ function CopyButton(props) {
           h('div', { 'data-ms-note': '' },
             '3. 保存后新建一个该 preset 的会话（老会话不受影响）'),
           h('div', { 'data-ms-note': '' },
-            '不想手改：复制下面第一条提示词发给 agent，让它带你做。')),
+            '不想手改：复制下面第二条「帮我启用」发给 agent，让它带你做。')),
         // 引导型复制按钮：复制的是「让 agent 读懂并汇报 / 帮你操作」的提示词
         h('div', { 'data-ms-sec': '' },
           h('span', { 'data-ms-sec-title': '' }, '看不懂？复制一条发给 agent'),
           h('div', { 'data-ms-note': '' }, COPY_HINT),
-          h(CopyButton, { label: '帮我启用或排查', text: COPY_HELP }),
           h(CopyButton, { label: '了解这个插件', text: COPY_UNDERSTAND }),
-          h(CopyButton, { label: '了解 companion 包', text: COPY_COMPANION }),
-          h(CopyButton, { label: '查看遮蔽状态', text: COPY_DIAGNOSE })),
+          h(CopyButton, { label: '帮我启用', text: COPY_HELP }),
+          h(CopyButton, { label: '查看遮蔽状态', text: COPY_DIAGNOSE }),
+          h(CopyButton, { label: '了解配套记忆包', text: COPY_COMPANION })),
         h('div', { 'data-ms-sec': '' },
           h('span', { 'data-ms-sec-title': '' }, '显示'),
           h('label', { 'data-ms-row': '', style: { cursor: 'pointer' } },
