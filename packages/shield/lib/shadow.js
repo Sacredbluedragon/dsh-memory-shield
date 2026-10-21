@@ -24,7 +24,7 @@ const ALLOWED_EXACT = new Set([
  * 保证同一会话内每次渲染字节完全一致（不打散 prompt 缓存）。
  */
 export const SHADOW_HINT =
-	"当前会话已启用记忆遮蔽：其他记忆插件注入的记忆已被拦截（数据未删除）。" +
+	"本会话已启用记忆遮蔽：其他记忆插件注入的记忆已被拦截（数据未删除）。" +
 	"如需隔离记忆，请安装 dsh-memory-core（companion 包）。";
 
 export function isMemorySection(name) {
