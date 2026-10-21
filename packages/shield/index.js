@@ -132,6 +132,8 @@ function makeApiHandler() {
 			json(200, {
 				ok: true,
 				data: {
+					layer: inst?.layer ?? 'profile',
+					presetName: inst?.layer === 'preset' ? (cfg.presetName || 'default') : '',
 					enabled: cfg.enabled === true,
 					hintDismissed: ui.hintDismissed === true,
 					showInSettings: ui.showInSettings !== false && cfg.showInSettings !== false,
