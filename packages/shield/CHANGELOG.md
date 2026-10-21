@@ -2,6 +2,22 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 格式。
 
+## [0.1.4] - 2026-10-21
+
+### Changed
+- README 按代码实际行为重写：版本号、默认值、工具与 section 数量、安装与启用步骤全部对齐 0.1.3。
+- 删掉已不存在的「patch 带 `disabled: true`」说明与「本插件无设置面板」旧描述。
+- 快速开始示例补上子插件必需的 `name: 'dsh-memory-shield'`（照抄即可跑）。
+
+## [0.1.3] - 2026-10-21
+
+### Changed
+- 分层加载：profile 层只注册状态查询与提示，不遮蔽、不写盘；preset 层才注册遮蔽。分层用 `@deepseek-ai/dsh-scope` 的 `scopeOf` / `scopeParentOf` 判定。
+- `cordis.patch.yml` 去掉 `disabled: true`，装了就加载（profile 层零副作用）。
+- `inject` 补 `webServer`，否则 profile 分支的状态路由注册不上。
+- 面板配置补 `hintDismissed` / `showInSettings` 两键。
+- 浏览器半端提示文案去掉「失忆」这类说法。
+
 ## [0.1.2] - 2026-10-21
 
 ### Changed
@@ -23,7 +39,7 @@
 - 首版：纯遮蔽器，不自带记忆功能
 - 默认遮蔽 memory-evolve 的两个注入段（`memory:snapshot` / `prompt:injections`）
 - `shadowTools` 接管 2 个工具名（`de_prompts` / `dtodo`）
-- `autoShadow` 自动追加 19 个常见 `memory_*` / `memoir_*` 工具名，合计 21 个工具桩
+- `autoShadow` 自动追加 20 个常见 `memory_*` / `memoir_*` 工具名，合计 22 个工具桩、10 个 context section
 - `shadowWhitelist` 白名单机制
 - `shadow_diagnose` 诊断工具（始终注册，包括 enabled=false）
 
