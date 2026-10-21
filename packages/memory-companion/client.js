@@ -11,7 +11,7 @@ window.__ModuleLoader__.load({
     const h = React.createElement;
 
     const PKG = "dsh-memory-core";
-    const API = "/api/memory-shield";
+    const API = "/api/memory-core";
     const jget = async (p) => (await fetch(API + p, { credentials: "same-origin" })).json();
 
     const CSS = `
@@ -93,7 +93,7 @@ window.__ModuleLoader__.load({
           )),
         h("div", { "data-pmc-sec": "" },
           h("div", { "data-pmc-row": "" },
-            h("button", { "data-pmc-btn": "", onClick: () => window.open("./manage.html", "_blank") }, "打开记忆管理面板"),
+            h("a", { href: "/api/memory-core/manage", target: "_blank", rel: "noopener", "data-pmc-btn": "" }, "打开记忆管理面板"),
           ),
           h("div", { "data-pmc-note": "" },
             "管理面板在独立窗口打开，可查看/修改/归档各轨记忆。升级到 full 模式（五轨）需在配置里改 memoryTracks=full。")),

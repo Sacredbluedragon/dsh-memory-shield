@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>遮蔽会话记忆管理 — dsh-memory-shield</title>
+<title>遮蔽会话记忆管理 — dsh-memory-core</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230ea5e9'/%3E%3Cpath d='M5 4h6v2H5zM5 8h6v2H5zM5 12h4v2H5z' fill='white'/%3E%3C/svg%3E">
 <style>
   :root {
@@ -21,6 +21,23 @@
     --warn: #b26a00;
     --warn-weak: #fdf3e3;
     --radius: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1d23;
+      --card: #23272f;
+      --border: #3a3f4a;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #5b8def;
+      --accent-weak: #1e2a45;
+      --danger: #f06a7a;
+      --danger-weak: #3a1f24;
+      --ok: #4fc08d;
+      --ok-weak: #1a3329;
+      --warn: #d9903a;
+      --warn-weak: #3a2e1a;
+    }
   }
   * { box-sizing: border-box; }
   body {
@@ -184,7 +201,7 @@
     <h3>当前是纯遮蔽状态（无记忆）</h3>
     <p class="empty">本 preset 只遮蔽其他记忆插件，自己没有开记忆。三种状态：纯遮蔽（默认）/ 轻量记忆（三轨）/ 完整记忆（五轨）。</p>
     <p class="note">切到轻量或完整记忆：在插件设置里打开「记忆功能」（轻量默认 lite 三轨；想要五轨再设 memoryTracks: full），然后刷新本页。复制下面这句给 agent：<br>
-    <code>请把 memory-shield 切到「完整记忆」状态：memoryEnabled=true，memoryTracks=full，然后告诉我怎么用记忆管理面板。</code></p>
+    <code>请把 dsh-memory-core 切到「完整记忆」状态：memoryTracks=full，然后告诉我怎么用记忆管理面板。</code></p>
   </div>
 
   <div class="layout" id="layout" style="display:none">
@@ -223,7 +240,7 @@
   }
 
   async function loadStatus() {
-    const data = await api("/memory-shield/status.json");
+    const data = await api("/api/memory-core/status");
     state.status = data.data;
     state.tracks = data.data.tracks || [];
     renderStatus();
@@ -282,7 +299,7 @@
   }
 
   async function loadTrack(track) {
-    const data = await api("/memory-shield/entries.json?track=" + encodeURIComponent(track));
+    const data = await api("/api/memory-core/entries?track=" + encodeURIComponent(track));
     state.cache[track] = data.data;
     renderTrack(track);
   }
@@ -367,7 +384,7 @@
       const contentText = input.value.trim();
       if (!contentText) { toast("内容为空"); return; }
       try {
-        await api("/memory-shield/entries.json", {
+        await api("/api/memory-core/entry", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "add", track, content: contentText }),
@@ -411,7 +428,7 @@
           body.entry = state.cache[track].entries[index];
           body.content = textarea.value;
           try {
-            await api("/memory-shield/entries.json", {
+            await api("/api/memory-core/entry", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(body),
@@ -434,7 +451,7 @@
         if (op === "delete" && !confirm("确认删除这条记忆？此操作不可撤销。")) return;
         body.entry = source;
         try {
-          await api("/memory-shield/entries.json", {
+          await api("/api/memory-core/entry", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
@@ -449,7 +466,7 @@
 
   loadStatus().catch((e) => {
     toast("初始化失败：" + e.message);
-    $("#status-line").innerHTML = '<span class="chip off">无法连接插件后端（/memory-shield）</span>';
+    $("#status-line").innerHTML = '<span class="chip off">无法连接插件后端（/api/memory-core）</span>';
   });
 })();
 </script>

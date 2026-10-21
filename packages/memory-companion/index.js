@@ -12,8 +12,9 @@ import { MemoryStore, SuggestionQueue, ArchiveStore } from "./lib/store.js";
 import { renderSnapshot } from "./lib/render.js";
 import { writeGapCounter } from "./lib/watchdog.js";
 import { tracksOf, TRACK_FILES, PENDING_FILE } from "./lib/tracks.js";
-import { existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const name = PLUGIN_NAME;
 const inject = ["systemPrompt", "tools", "webServer"];
@@ -95,44 +96,64 @@ function apply(ctx, config) {
 		`${name}: memory:snapshot inject`,
 	);
 
-	// ── webServer entries API ────────────────────────────────────
+	// ── webServer API ───────────────────────────────────────────
 	ctx.effect(
 		() =>
 			ctx.webServer.register({
 				kind: "prefix",
-				path: "/api/memory-shield",
+				path: "/api/memory-core",
 				handler: async (req, res) => {
 					const url = new URL(req.url, "http://127.0.0.1");
 					const json = (code, data) => {
 						res.writeHead(code, { "content-type": "application/json" });
 						res.end(JSON.stringify(data));
 					};
+					const cwd = ctx.agent?.session?.header?.cwd;
 
-					// GET /entries?track=memory —— 列出某轨条目
-					if (req.method === "GET" && url.pathname === "/api/memory-shield/entries") {
+					// GET /manage —— 返回 manage.html 页面
+					if (req.method === "GET" && url.pathname === "/api/memory-core/manage") {
+						try {
+							const htmlPath = join(dirname(fileURLToPath(import.meta.url)), "manage.html");
+							const html = readFileSync(htmlPath, "utf8");
+							res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+							res.end(html);
+						} catch (e) {
+							json(500, { ok: false, why: e?.message ?? String(e) });
+						}
+						return;
+					}
+
+					// GET /status —— 面板状态
+					if (req.method === "GET" && url.pathname === "/api/memory-core/status") {
+						json(200, {
+							ok: true,
+							data: {
+								memoryEnabled: true,
+								memoryTracks: s.memoryTracks,
+								presetName: s.presetName,
+								memoryDir,
+								tracks: tracksOf(s.memoryTracks),
+							},
+						});
+						return;
+					}
+
+					// GET /entries?track=memory —— 列出某轨正式条目 + 待确认 + 归档
+					if (req.method === "GET" && url.pathname === "/api/memory-core/entries") {
 						const track = url.searchParams.get("track") || "memory";
 						try {
 							const entries = store.entriesOf(track, ctx.agent);
-							json(200, { ok: true, data: { track, entries, count: entries.length } });
+							const pendingItems = pending.read().filter((p) => p.target === track);
+							const archived = archive.entriesOf(track, cwd);
+							json(200, { ok: true, data: { track, entries, pending: pendingItems, archived, count: entries.length } });
 						} catch (e) {
 							json(500, { ok: false, why: e?.message ?? String(e) });
 						}
 						return;
 					}
 
-					// GET /pending —— 待确认队列
-					if (req.method === "GET" && url.pathname === "/api/memory-shield/pending") {
-						try {
-							const items = pending.read();
-							json(200, { ok: true, data: { items, count: items.length } });
-						} catch (e) {
-							json(500, { ok: false, why: e?.message ?? String(e) });
-						}
-						return;
-					}
-
-					// POST /entry —— 新增/替换/删除
-					if (req.method === "POST" && url.pathname === "/api/memory-shield/entry") {
+					// POST /entry —— 所有写操作
+					if (req.method === "POST" && url.pathname === "/api/memory-core/entry") {
 						try {
 							const body = await new Promise((resolve) => {
 								let raw = "";
@@ -141,18 +162,49 @@ function apply(ctx, config) {
 									try { resolve(JSON.parse(raw || "{}")); } catch { resolve({}); }
 								});
 							});
-							const { action, target, content, match } = body;
-							if (action === "add") store.add(target, content, ctx.agent);
-							else if (action === "replace") store.replace(target, match, content, ctx.agent);
-							else if (action === "remove") store.remove(target, match, ctx.agent);
-							else if (action === "archive") {
-								const removed = store.remove(target, match, ctx.agent);
-								if (removed?.ok !== false) {
-									archive.append(target, removed?.removed || match, ctx.agent?.session?.header?.cwd);
+							const { action, track, target, content, entry, match, index } = body;
+							const t = track || target || "memory";
+
+							if (action === "add") {
+								if (t === "key" && s.writeGuard) {
+									pending.append({ target: t, content, at: new Date().toISOString() });
+								} else {
+									store.add(t, content, ctx.agent);
 								}
+							} else if (action === "replace" || action === "edit" || action === "saveEdit") {
+								store.replace(t, match || entry, content, ctx.agent);
+							} else if (action === "delete" || action === "remove") {
+								store.remove(t, match || entry, ctx.agent);
+							} else if (action === "archive") {
+								store.remove(t, match || entry, ctx.agent);
+								archive.append(t, match || entry, cwd);
+							} else if (action === "confirm") {
+								// 待确认 → 正式写入
+								const items = pending.read();
+								const idx = Number(index);
+								if (items[idx]) {
+									store.add(items[idx].target, items[idx].content, ctx.agent);
+									items.splice(idx, 1);
+									pending.write(items);
+								}
+							} else if (action === "reject") {
+								// 待确认 → 删除
+								const items = pending.read();
+								const idx = Number(index);
+								if (items[idx] !== undefined) {
+									items.splice(idx, 1);
+									pending.write(items);
+								}
+							} else if (action === "promote") {
+								// 归档 → 移回主轨
+								store.add(t, entry, ctx.agent);
+								archive.removeExact(t, entry, cwd);
+							} else if (action === "removeArchive") {
+								archive.removeExact(t, entry, cwd);
+							} else {
+								return json(400, { ok: false, why: "unknown action: " + action });
 							}
-							else return json(400, { ok: false, why: "unknown action" });
-							json(200, { ok: true, data: { action, target } });
+							json(200, { ok: true, data: { action, target: t } });
 						} catch (e) {
 							json(500, { ok: false, why: e?.message ?? String(e) });
 						}
@@ -162,7 +214,7 @@ function apply(ctx, config) {
 					json(404, { ok: false, why: "not found" });
 				},
 			}),
-		`${name}: webServer entries API`,
+		`${name}: webServer API`,
 	);
 
 	ctx.logger.info(

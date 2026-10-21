@@ -4,18 +4,113 @@
  * 在指定 preset 内遮蔽其他记忆插件的注入和工具，让这个通道拥有干净的上下文。
  * 本插件不自带任何记忆存储/写入/管理能力——记忆是可选 companion 插件的事。
  * 查看遮蔽状态：让 agent 调用 shadow_diagnose 工具。
+ *
+ * 分层：
+ *   - profile 层（无会话上下文）：只注册 GET /api/memory-shield/state 与提示，不遮蔽、不写盘。
+ *   - preset 层（有会话上下文）：注册遮蔽逻辑（memory context + tools）。
  */
 import { PLUGIN_NAME } from "./lib/constants.js";
 import { DEFAULTS } from "./lib/defaults.js";
 import { shadowEmptyContext, shadowTool, shadowDiagnoseTool, isMemorySection } from "./lib/shadow.js";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+
+// 分层判定依赖内核的 scope API；拿不到时保守判为 profile 层（不遮蔽）。
+let scopeApi = null;
+try { scopeApi = await import("@deepseek-ai/dsh-scope"); } catch { scopeApi = null; }
+
+// UI 配置写到用户数据目录（~/.dsh/plugin-data/<pkg>/），避免 npm install 覆盖
+const HOME = process.env.USERPROFILE || process.env.HOME || '';
+const UI_DIR = HOME ? join(HOME, '.dsh', 'plugin-data', 'dsh-memory-shield') : HERE;
+const UI_CFG = join(UI_DIR, 'ui-config.json');
+
+function readUiCfg() {
+  try {
+    return JSON.parse(readFileSync(UI_CFG, "utf8"));
+  } catch { return {}; }
+}
+function writeUiCfg(patch) {
+  const cur = readUiCfg();
+  const next = { ...cur, ...patch };
+  try { mkdirSync(UI_DIR, { recursive: true }); } catch {}
+  writeFileSync(UI_CFG, JSON.stringify(next, null, 2), "utf8");
+  return next;
+}
 
 const name = PLUGIN_NAME;
-const inject = ["systemPrompt", "tools"];
+const inject = ["systemPrompt", "tools", "webServer"];
 
 function apply(ctx, config) {
 	const s = { ...DEFAULTS, ...(config ?? {}) };
 
-	// 自动从会话 preset 派生（注：ctx.session 内核是 sessions，此功能暂名存实亡）
+	// 判定分层：preset 插件挂在 preset 的 standing scope 里（scope 有 parent）；
+	// profile 层在 root scope（无 parent）。拿不到 dsh-scope 时保守判为 profile 层（不遮蔽）。
+	// __forceLayer 仅给 dryrun 用，生产上下文不会设它。
+	const forced = ctx?.__forceLayer;
+	const scopeKey = scopeApi?.scopeOf?.(ctx);
+	const isPresetLayer = forced === "preset" ? true
+		: forced === "profile" ? false
+		: !!scopeApi && scopeKey !== undefined && scopeApi.scopeParentOf?.(scopeKey) !== undefined;
+
+	if (!isPresetLayer) {
+		// ── profile 层：只注册状态查询与提示，不遮蔽、不写盘 ──
+		ctx.logger.info(`${name}: profile layer — registering state endpoint only (no shadowing)`);
+
+		try {
+			ctx.effect(
+				() =>
+					ctx.webServer.register({
+						kind: 'prefix',
+						path: '/api/memory-shield',
+						handler: async (req, res) => {
+							const url = new URL(req.url, 'http://127.0.0.1');
+							const ui = readUiCfg();
+							if (req.method === 'GET' && url.pathname === '/api/memory-shield/state') {
+								res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+								res.end(JSON.stringify({
+									ok: true,
+									data: {
+										enabled: s.enabled === true,
+										hintDismissed: ui.hintDismissed === true,
+										showInSettings: ui.showInSettings !== false && s.showInSettings !== false,
+									},
+								}));
+								return;
+							}
+							if (req.method === 'POST' && url.pathname === '/api/memory-shield/config') {
+								let body = {};
+								try { body = await new Promise((resolve) => {
+									let raw = '';
+									req.on('data', (d) => { raw += d; if (raw.length > 65536) req.destroy(); });
+									req.on('end', () => { try { resolve(JSON.parse(raw)); } catch { resolve({}); } });
+									req.on('error', () => resolve({}));
+								}); } catch {}
+								const patch = {};
+								if (typeof body?.hintDismissed === 'boolean') patch.hintDismissed = body.hintDismissed;
+								if (typeof body?.showInSettings === 'boolean') patch.showInSettings = body.showInSettings;
+								const next = writeUiCfg(patch);
+								res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+								res.end(JSON.stringify({ ok: true, data: next }));
+								return;
+							}
+							res.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });
+							res.end(JSON.stringify({ ok: false, why: 'not found' }));
+						},
+					}),
+				`${name}: /api/memory-shield/state endpoint`,
+			);
+		} catch (e) {
+			try { ctx.logger?.warn?.(`${name}: state endpoint failed: ${e?.message ?? e}`) } catch {}
+		}
+		return;
+	}
+
+	// ── preset 层：现有遮蔽逻辑 ──
+
+	// 自动从会话 preset 派生
 	if (s.autoPresetFromSession === true) {
 		const sessionPreset = ctx.session?.header?.agentPreset;
 		if (sessionPreset) {

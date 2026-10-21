@@ -16,4 +16,7 @@ export const DEFAULTS = {
 	autoShadow: true,
 	shadowWhitelist: [],
 	autoPresetFromSession: false,
+	// UI 配置（profile 层提示用）
+	hintDismissed: false,
+	showInSettings: true,
 };

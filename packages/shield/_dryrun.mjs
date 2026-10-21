@@ -39,6 +39,7 @@ check("Config 字段集 == defaults 键集",
 // 5. 模拟 ctx 跑一次 apply（enabled=true）
 const calls = { effects: [], tools: [], contexts: [], logs: [] };
 const fakeCtx = {
+	__forceLayer: "preset",
 	logger: { info: (...a) => calls.logs.push(a.join(" ")), warn: (...a) => calls.logs.push(a.join(" ")) },
 	effect: (fn, tag) => { calls.effects.push(tag); try { fn(); } catch (e) { calls.logs.push("effect err: " + e.message); } },
 	tools: { register: (t) => calls.tools.push(t.name || t) },
@@ -59,6 +60,7 @@ check("systemPrompt.context 都带 order", calls.contexts.every((c) => typeof c.
 // 6. enabled=false 时不注册遮蔽 effect，但仍注册 diagnose
 const calls2 = { effects: [], tools: [], logs: [] };
 const fakeCtx2 = {
+	__forceLayer: "preset",
 	logger: { info: (...a) => calls2.logs.push(a.join(" ")), warn: (...a) => calls2.logs.push(a.join(" ")) },
 	effect: (fn, tag) => { calls2.effects.push(tag); try { fn(); } catch (e) {} },
 	tools: { register: (t) => calls2.tools.push(t.name || t) },
@@ -71,6 +73,7 @@ check("enabled=false 时仍注册 diagnose", calls2.tools.includes("shadow_diagn
 // 7. 空 config（bundle 形态默认）不遮蔽：只注册 diagnose，不注册遮蔽 effect
 const calls3 = { effects: [], tools: [] };
 const fakeCtx3 = {
+	__forceLayer: "preset",
 	logger: { info: () => {}, warn: () => {} },
 	effect: (fn, tag) => { calls3.effects.push(tag); try { fn(); } catch (e) {} },
 	tools: { register: (t) => calls3.tools.push(t.name || t) },
@@ -79,6 +82,21 @@ const fakeCtx3 = {
 apply(fakeCtx3, {});
 check("空 config 默认不遮蔽（bundle 形态装完安全）", calls3.effects.length === 1 && calls3.effects[0].includes("diagnose"), `${calls3.effects.length} 个 effect`);
 check("空 config 仍注册 diagnose", calls3.tools.includes("shadow_diagnose"));
+
+// 8. profile 层：只注册状态路由，不遮蔽、不注册 diagnose
+const calls4 = { effects: [], tools: [], routes: [] };
+const fakeCtx4 = {
+	__forceLayer: "profile",
+	logger: { info: () => {}, warn: () => {} },
+	effect: (fn, tag) => { calls4.effects.push(tag); try { fn(); } catch (e) {} },
+	tools: { register: (t) => calls4.tools.push(t.name || t) },
+	systemPrompt: { context: () => {} },
+	webServer: { register: (r) => { calls4.routes.push(r.path); return () => {}; } },
+};
+apply(fakeCtx4, { enabled: true });
+check("profile 层注册状态路由", calls4.routes.includes("/api/memory-shield"), `${calls4.routes.length} 条`);
+check("profile 层不注册 diagnostic tool", !calls4.tools.includes("shadow_diagnose"));
+check("profile 层不遮蔽（即使 enabled=true）", !calls4.effects.some((t) => t.includes("shadow section") || t.includes("shadow tool")), `${calls4.effects.length} 个 effect`);
 
 // 总结
 const failed = results.filter((r) => !r.ok);
