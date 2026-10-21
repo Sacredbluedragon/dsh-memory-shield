@@ -1,214 +1,133 @@
 # dsh-memory-shield
 
-**这是一个遮蔽器，不是记忆插件。**
+在指定 DSH preset 里挡掉其他记忆插件的上下文段与工具，让那个会话拿到干净上下文。
 
-在指定 preset 内遮蔽其他记忆插件的注入和工具，让这个通道拥有干净的上下文。
+它不存记忆、不写文件、不提供新能力，只做遮蔽。
 
-![version](https://img.shields.io/badge/version-0.1.1-blue)
+![version](https://img.shields.io/badge/version-0.1.3-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
-> **插件信息**
-> - **名字**：dsh-memory-shield
-> - **定位**：DSH preset 级记忆遮蔽器——挡住其他记忆插件往这个 preset 里注入
-> - **默认状态**：bundle 形态装进 profile 后默认关闭（`enabled: false`），不遮蔽任何会话；在目标 preset 里显式写 `config.enabled: true` 才生效。
-> - **遮蔽范围**：默认覆盖 DSH 生态下载量前 8 的记忆插件（prime-memory / memory-eternal / meow-memory / memento / auto-memory / memory-palace / memoir 等）
-> - **已知限制**：挡不住 pre-step user message 注入（openviking-memory 等）和消息级注入（meow-memory）
-
-## 目录
-
-- [它解决什么](#它解决什么)
-- [安装](#安装)
-- [快速开始](#快速开始)
-- [配置](#配置)
-- [三层遮蔽](#三层遮蔽)
-- [设置面板](#设置面板)
-- [自测](#自测)
-- [还没做的](#还没做的)
+> [!IMPORTANT]
+> - 装进 profile 后**默认不遮蔽任何会话**（`enabled: false`）；要遮蔽，得在目标 preset 里挂载并显式启用。
+> - 只挡 `systemPrompt` 的 context 与工具的同名注册；消息级注入、pre-step user message 注入挡不住。
+> - 遮蔽失败不会报错，状态要用 `shadow_diagnose` 工具或面板查。
 
 ## 它解决什么
 
-如果你装了记忆插件（memory-evolve / prime-memory / auto-memory 等），它们会把记忆注入到所有会话里。但某些 preset 不该吃到这些注入——它们该有自己的干净上下文。
+装了记忆插件（memory-evolve、prime-memory、auto-memory 等）之后，它们会把记忆注入到所有会话。某些 preset 不该吃这些注入，应该有自己独立的上下文。
 
-这个插件就是干这个的：**在指定 preset 里遮蔽记忆插件的注入和工具，让这个通道独立出来**。
-
-### 遮蔽原理
-
-只用内核自带的**按作用域同名遮蔽**，不改其他插件本体：
-
-| 面 | 手段 |
-|---|---|
-| 文字 | 在本作用域注册同名 context，遮蔽其他插件的注入文本 |
-| 工具 | 在本作用域注册同名工具（空壳），接管其他插件的工具名 |
-
-默认遮蔽覆盖 DSH 生态主流记忆插件的工具名与 context section：
-
-`shadowTools` 默认 2 个（`de_prompts` / `dtodo`），
-`autoShadow` 自动追加 19 个常见 `memory_*` / `memoir_*` 工具名，合计 21 个工具桩。
-`shadowSections` 默认 2 个（`memory:snapshot` / `prompt:injections`，memory-evolve 的两个注入段），
-`autoShadow` 自动追加 8 个其他记忆插件的常见 section。
-
-**挡不住的**：
-- **消息级注入**——部分插件（如 meow-memory）往消息流里插独立 snapshot 消息，这不是 context section，同名遮蔽管不到。
-- **pre-step user message 注入**——openviking-memory 等插件通过 `agent/pre-step` waterfall 注入 user message，不走 systemPrompt.context。这种方式目前无法遮蔽。
-- 建议在 preset 层不安装这类插件。
-
-**改名单注意**：如果在 `cordis.patch.yml` 里显式写了 `shadowTools` 或 `shadowSections`，
-YAML 会整块替换 schema 默认值，不会深合并。要在默认名单基础上加，先把默认名单复制出来再追加。
-或者：不写这两个配置项，直接用默认值。
-
-**工具名可配，白名单挡不住改名**——`de_prompts` / `dtodo` 来自 evolve 的
-`config.promptToolName` / `config.todoToolName`。把默认名加进 `shadowTools` 是防御性的；
-改了配置名照样绕过。彻底解法是 profile 层不下发这两个工具。
-
-### 为什么不用 `includeRuntimeContext: false`
-
-`@deepseek-ai/dsh-persona` 的 `includeRuntimeContext: false` 会调用
-`systemPrompt.suppressRuntimeContext()`，它是**全有或全无**——会连这个 preset 自己的
-surface prompt 一起灭掉。所以只能走同名遮蔽。
+这个插件在指定 preset 里用同名覆盖挡住这些注入和工具，其他插件本体不动。
 
 ## 安装
-
-**bundle 形态，装进 profile 也默认关闭，不影响任何会话。**
 
 ```bash
 dsh plugin --profile web add dsh-memory-shield
 ```
 
-装完是「已安装、未启用」：包里 `cordis.patch.yml` 那行带 `disabled: true`，插件不会被 apply，任何会话都不遮蔽。
+装完重启 DSH，插件详情页会出现一块面板：显示当前状态，以及启用方式。这一步不会改变任何会话的行为。
 
-**在目标 preset 里启用**（这才是它的用法）：
+## 在 preset 里启用
+
+它只在 preset 里生效。在目标 preset 的 `plugins:` 里加一项：
 
 ```yaml
-# 目标 preset 的 plugins 里加一项
 - id: memory-shield
   name: 'dsh-memory-shield'
   config:
     enabled: true
 ```
 
-**为什么默认关**：它靠按作用域同名遮蔽工作。如果在 profile 层全局启用，10 个空 context + 21 个死工具会对**每个**会话生效，还会和全局记忆插件撞名抛 `prompt context "memory:snapshot" is already registered`。默认关 + 只在 preset 里开，这个事故就不会发生。
-
-**市场里误点「启用」会怎样**：profile 那行变成启用，但插件自身 `enabled` 默认仍是 false，所以只会注册一个只读诊断工具 `shadow_diagnose`，不会遮蔽。要真正全局遮蔽，得连 `enabled` 一起改成 true——不推荐。
-
-**反向成本：** 21 个空壳工具常驻工具表，每回合多几百 token。如果你只遮蔽 1-2 个记忆插件，可以把 `autoShadow: false` 关掉，手动配 `shadowTools` / `shadowSections`。
-
-本包具备市场收录形态（`dsh.bundle` + `cordis.patch.yml`），收录后按上面的默认关闭方式安装。
-
-## 快速开始
-
-**只在目标 preset 的 `plugins:` 里挂，不进 `dsh.profile.bundles`。**
+完整示例（一个自定义 preset）：
 
 ```yaml
-# cordis.patch.yml
 - insert:
-    - id: my-shield
+    - id: preset-quiet
       name: '@deepseek-ai/dsh-agent-preset'
       config:
-        id: my-shield
-        name: 我的遮蔽模式
+        id: quiet
+        name: 干净通道
         plugins:
-          # ... 你需要的其他插件
           - id: memory-shield
+            name: 'dsh-memory-shield'
             config:
-              presetName: "my-shield"
+              enabled: true
 ```
+
+改完重启，或新建一个选择该 preset 的会话。
+
+**为什么不在 profile 层启用**：同名遮蔽会在本作用域注册 22 个空工具和 10 个空 context。全局启用会让每个会话都吃到这些空桩，还会和全局记忆插件撞名（报 `prompt context "memory:snapshot" is already registered`）。放在 preset 里，影响面只有那一个通道。
 
 ## 配置
 
 | 键 | 默认 | 说明 |
 |---|---|---|
-| `enabled` | `true` | 关掉即完全不注册遮蔽（diagnose 工具仍注册） |
-| `presetName` | `"default"` | 通道名 |
-| `shadowTools` | 2 个 | 要遮蔽的同名工具：`de_prompts` / `dtodo` |
-| `shadowSections` | 2 个 | 要遮蔽的 context section 名：`memory:snapshot` / `prompt:injections`（memory-evolve 的两个注入段） |
-| `autoShadow` | `true` | 自动注册常见 `memory_*` / `memoir_*` 工具名 |
-| `shadowWhitelist` | `[]` | 不遮蔽的名字白名单（对显式和 AUTO 统一生效） |
-| `autoPresetFromSession` | `false` | 自动按会话工作目录派生 presetName（暂未实装，名存实亡） |
+| `enabled` | `false` | 关掉即不注册任何遮蔽（诊断工具仍注册） |
+| `presetName` | `"default"` | 只用于日志标注，不影响行为 |
+| `shadowTools` | `de_prompts` / `dtodo` | 按工具名精确遮蔽 |
+| `shadowSections` | `memory:snapshot` / `prompt:injections` | 按 context 段名精确遮蔽 |
+| `autoShadow` | `true` | 追加常见 `memory_*` / `memoir_*` 工具名与常见记忆 section |
+| `shadowWhitelist` | `[]` | 不遮蔽的名字（对精确与自动名单统一生效） |
+| `autoPresetFromSession` | `false` | 预留；当前内核没有 `ctx.session`，这条不生效 |
+| `hintDismissed` | `false` | 提示横幅是否已被关掉 |
+| `showInSettings` | `true` | 设置页是否也显示这块面板 |
 
-## 三层遮蔽
+## 遮蔽了什么
 
-默认 `autoShadow: true`，开箱即用，不需要理解下面三层。只有当你发现某个记忆插件没被挡住时，才需要看这里：
+开启后，在该 preset 的作用域内注册同名 context 与同名工具，覆盖别处的注册：
 
-| 层 | 字段 | 干什么 | 什么时候需要调 |
-|---|---|---|---|
-| 精确工具名 | `shadowTools` | 直接遮蔽指定工具名 | 发现某个工具名漏了 |
-| 精确 context | `shadowSections` | 直接遮蔽指定 context section | 发现某个注入文本漏了 |
-| 自动展开 | `autoShadow` | 自动注册常见 `memory_*` / `memoir_*` 工具名 | 默认开，不用管 |
+- **工具**：2 个精确名 + 20 个自动名，共 22 个空桩；
+- **context**：`memory:snapshot` 空遮蔽 + `prompt:injections` + 8 个自动 section，共 10 个。
 
-**白名单**：`shadowWhitelist` 里的名字不会被遮蔽。如果某个工具你想让它在这个 preset 里正常用，加进来。
+自动名单覆盖 memory-evolve、memory-eternal、meow-memory、memory-palace、memento、auto-memory、prime-memory、memoir 这些插件常见的工具名与段名。
 
-## 查看遮蔽状态
+**改名单注意**：在 `cordis.patch.yml` 里写 `shadowTools` / `shadowSections` 会整块替换默认值，不深合并。要加名字，先把默认名单抄出来再追加。
 
-本插件无设置面板。让 agent 调用 `shadow_diagnose` 工具，即可看到当前遮蔽了多少工具、多少 context、哪些在白名单。
+## 挡不住的
+
+- **消息级注入**：部分插件（如 meow-memory）往消息流里插独立快照消息，不是 context section，同名遮蔽管不到。
+- **pre-step user message 注入**：openviking-memory 这类插件在 `agent/pre-step` 里注入 user message，不经过 `systemPrompt.context`。
+
+这类插件不要装进需要遮蔽的 preset。
+
+## 为什么不用 `includeRuntimeContext: false`
+
+`@deepseek-ai/dsh-persona` 的这个开关调用 `systemPrompt.suppressRuntimeContext()`，是整块关闭，会把 preset 自己的 surface prompt 一起关掉。所以只能走同名遮蔽。
+
+## 查看状态
+
+两条路：
+
+- 插件详情页面板：显示当前是否启用、怎么启用；
+- 让 agent 调 `shadow_diagnose`：返回遮蔽了多少工具、多少 context、白名单里有什么。
 
 ## 自测
+
+源码仓库里有 `_dryrun.mjs`（不随 npm 包发布）：
 
 ```bash
 node _dryrun.mjs
 ```
 
-hermetic（落盘只用 `os.tmpdir()`，跑完删除；不碰真 `DSH_HOME`）。
+它用 `os.tmpdir()` 落盘、跑完删除，不碰真实的 `DSH_HOME`。
 
 ## 项目结构
 
 ```
-index.js          入口 + apply() 装配
+index.js          入口与 apply()
+client.js         浏览器半端：状态面板、提示横幅、详情页标签
 lib/
   constants.js    插件名
   defaults.js     默认配置
-  schema.js       schemastery schema（Config 导出）
-  shadow.js       context/tool 遮蔽
+  schema.js       schemastery schema
+  shadow.js       context / tool 遮蔽
 ```
 
-## 安全说明
+## 限制
 
-本插件解决的是 **context injection & over-sharing** 问题（OWASP MCP10:2025）：记忆插件把注入共享到所有会话，导致一个 preset 的上下文污染另一个 preset。
+- 遮蔽依赖内核的「同作用域同名覆盖」规则；内核若改成先注册者赢，这个机制就失效。
+- 遮蔽失败是静默的：状态要靠 `shadow_diagnose` 或面板确认，别只凭配置推断。
+- 工具名可配的记忆插件（如 evolve 的 `promptToolName` / `todoToolName`）改名后自动名单对不上，需要手动补进 `shadowTools`。
 
-遮蔽机制：在 preset scope 内注册同名 context 和工具，覆盖全局注册。这不是安全沙箱——如果用户在 preset 里同时装了两个记忆插件，它们仍然互相可见。
+## 许可
 
-已知挡不住的：
-- pre-step user message 注入（openviking-memory 等）
-- 消息级注入（meow-memory）
-
-## 设计说明
-
-### 这个插件在 DSH 生态里的位置
-
-DSH 是 agent 运行时，preset 是"工作模式"。记忆插件往 context 里注入内容，影响 agent 行为。
-
-本插件是一个**遮蔽器**——在特定 preset 里挡住这些注入。它不是记忆插件（不存储记忆），不是工具插件（不提供新能力），是一个**过滤器**——挡住不该进来的东西。
-
-### 设计取舍：修补 vs 扩展
-
-本插件依赖 DSH 的作用域遮蔽机制（同名注册覆盖）。这意味着：
-- 如果 DSH 的作用域规则变了（比如改成"先注册的赢"），本插件就废了
-- 我们是在**修补** DSH 的行为，不是在**扩展**它
-
-这是一个脆弱的位置。但没办法——DSH 没有提供"拦截其他插件注册"的机制，我们只能用同名遮蔽。
-
-### 为什么需要遮蔽？
-
-因为记忆插件往**所有**会话注入，污染了不该注入的会话。
-
-但这是**记忆插件的设计问题**，不是 DSH 的问题。记忆插件应该自己控制"往哪些会话注入"，而不是所有会话都注入。
-
-本插件是一个**绕过方案**——在记忆插件之上再加一层过滤。这是治标，不是治本。
-
-### 失败模式：静默失败
-
-最大的问题是**静默失败**——如果遮蔽失败了，用户不知道。
-
-用户以为遮蔽了，其实没有。其他记忆插件的注入照常进来，用户还以为自己有干净上下文。
-
-**解法**：本插件提供 `shadow_diagnose` 工具，agent 可以主动检查当前遮蔽状态。
-
-### 设计原则：防御性 vs 攻击性
-
-本插件是**防御性**的——挡住不该进来的东西。防御性的东西往往很复杂，因为要考虑所有可能的"攻击面"（所有记忆插件的所有注入方式）。
-
-我们默认 `autoShadow: true`，就是为了减少用户的认知负担——用户不需要知道有哪些记忆插件，我们自动挡住。
-
-## 还没做的
-
-- 超预算时的自动压缩
-- pre-step user message 注入的遮蔽（openviking-memory 等不走 systemPrompt.context 的插件）
+MIT。
