@@ -1,5 +1,5 @@
 // 纯遮蔽版 dryrun：验证导出契约、默认配置、遮蔽注册逻辑
-import { apply, inject, name, Config } from "./index.js";
+import { apply, inject, name, Config, layerFromScope } from "./index.js";
 import { DEFAULTS } from "./lib/defaults.js";
 import { PLUGIN_NAME } from "./lib/constants.js";
 
@@ -35,6 +35,13 @@ const defaultKeys = Object.keys(DEFAULTS).sort();
 check("Config 字段集 == defaults 键集",
 	JSON.stringify(configKeys) === JSON.stringify(defaultKeys),
 	`config=[${configKeys.join(",")}] defaults=[${defaultKeys.join(",")}]`);
+
+// 4b. 分层判定回归（T12 P0-1：preset 的 generation scope 没有 parent）
+check("root ctx（scopeKey=undefined）判 profile", layerFromScope(undefined, true) === "profile");
+check("generation scope（有 scopeKey、无 parent）判 preset", layerFromScope("generation:abc", true) === "preset");
+check("拿不到 dsh-scope 时保守判 profile", layerFromScope(undefined, false) === "profile");
+check("__forceLayer=preset 优先", layerFromScope(undefined, true, "preset") === "preset");
+check("__forceLayer=profile 优先", layerFromScope("generation:abc", true, "profile") === "profile");
 
 // 5. 模拟 ctx 跑一次 apply（enabled=true）
 const calls = { effects: [], tools: [], contexts: [], logs: [] };
