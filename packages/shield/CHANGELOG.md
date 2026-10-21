@@ -2,6 +2,18 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 格式。
 
+## [0.1.6] - 2026-10-21
+
+### Added
+- 遮蔽段里挂一句给 agent 的说明（`SHADOW_HINT`，只挂 `memory:snapshot`）：当前会话的记忆已被拦截、数据未删除、需要隔离记忆可装 companion 包。
+- `GET /api/memory-shield/health`：返回 version / layer / enabled / presetName / 实际生效的 tools 与 sections 数量。
+- 面板顶部「说明段」与三个「引导型」复制按钮（了解插件 / 了解 companion / 查看遮蔽状态），复制出去的提示词都写明「不要帮我改配置」。
+
+### Changed
+- `POST /api/memory-shield/config` 加白名单：只接受 `hintDismissed` / `showInSettings` 两个布尔键，未知键 400、body 超 64 KiB 400。
+- 客户端面板：状态读取收敛到 `useShieldState()`（同一时刻只发一次请求，挂载复用缓存）；横幅 z-index 改 `var(--ms-overlay-z,9999)`；静默 catch 全部改 `console.warn`。
+- 面板错误态显示「状态加载失败：原因 + 重试」按钮，不再只显示「状态不可用」。
+
 ## [0.1.5] - 2026-10-21
 
 ### Fixed
