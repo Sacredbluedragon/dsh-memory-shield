@@ -1,6 +1,6 @@
 {
   "name": "dsh-memory-shield",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Universal memory shadow plugin for DSH: shadows other memory plugins' context and tools within a preset, giving that channel a clean context.",
   "type": "module",
   "main": "./index.js",
@@ -10,7 +10,6 @@
     "dsh",
     "dsh-plugin",
     "deepseek-harness",
-    "preset",
     "memory",
     "shadow",
     "shim"
@@ -46,7 +45,11 @@
       "patch": "./cordis.patch.yml"
     },
     "client": {
-      "platform": "web"
+      "platform": "web",
+      "inject": [
+        "dsh-client-runtime",
+        "dsh-client-ui-settings"
+      ]
     }
   },
   "peerDependencies": {
