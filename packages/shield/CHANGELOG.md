@@ -2,6 +2,13 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 格式。
 
+## [0.1.5] - 2026-10-21
+
+### Fixed
+- 分层判定写反：preset 的 generation scope 没有 parent（内核 `dsh-agent-preset-registry` 建 scope 时不传 `options.parent`），旧逻辑「有 parent 才算 preset」把 preset 层误判成 profile 层，导致 preset 里 `enabled: true` 也直接早退、完全不遮蔽。改为「拿到 scopeKey 就是 preset 层」。
+- 分层判定抽成纯函数 `layerFromScope(scopeKey, hasScopeApi, forced)` 并导出，dryrun 补 5 条回归用例（含「真实 scope 无 parent」这条）。
+- `@deepseek-ai/dsh-scope` 写进 optional peerDependencies，并记录导入失败原因（不再静默吞掉）。
+
 ## [0.1.4] - 2026-10-21
 
 ### Changed
