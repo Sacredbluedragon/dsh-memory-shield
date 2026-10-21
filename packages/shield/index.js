@@ -117,7 +117,7 @@ function makeApiHandler() {
 				version: VERSION,
 				layer: inst?.layer ?? 'profile',
 				enabled: cfg.enabled === true,
-				presetName: cfg.presetName ?? DEFAULTS.presetName,
+				presetName: inst?.layer === 'preset' ? (cfg.presetName || 'default') : '',
 				// 实际生效数（已去重、已剔除白名单），不是配置数组长度
 				shadowTools: inst?.effective?.tools?.size ?? 0,
 				shadowSections: inst?.effective?.sections?.size ?? 0,
