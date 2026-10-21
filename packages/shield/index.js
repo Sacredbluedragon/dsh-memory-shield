@@ -18,9 +18,21 @@ import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-// 分层判定依赖内核的 scope API；拿不到时保守判为 profile 层（不遮蔽）。
+// 分层判定依赖内核的 scope API；拿不到时保守判为 profile 层（不遮蔽），并把原因记下来。
 let scopeApi = null;
-try { scopeApi = await import("@deepseek-ai/dsh-scope"); } catch { scopeApi = null; }
+let scopeImportError = null;
+try { scopeApi = await import("@deepseek-ai/dsh-scope"); } catch (e) { scopeApi = null; scopeImportError = e?.message || String(e); }
+
+// 分层判定的纯函数（dryrun 直接测，不依赖真实 ctx）：
+// preset 插件由 preset registry 在 generation scope 里挂载，scopeOf(ctx) 有值；
+// profile 层（bundle patch）跑在 root ctx 上，scopeOf(ctx) 返回 undefined。
+// 注意：generation scope 没有 parent（registry 建 scope 不传 options.parent），不能用 scopeParentOf 判。
+export function layerFromScope(scopeKey, hasScopeApi, forced) {
+	if (forced === "preset") return "preset";
+	if (forced === "profile") return "profile";
+	if (!hasScopeApi) return "profile";
+	return scopeKey !== undefined && scopeKey !== null ? "preset" : "profile";
+}
 
 // UI 配置写到用户数据目录（~/.dsh/plugin-data/<pkg>/），避免 npm install 覆盖
 const HOME = process.env.USERPROFILE || process.env.HOME || '';
@@ -46,14 +58,13 @@ const inject = ["systemPrompt", "tools", "webServer"];
 function apply(ctx, config) {
 	const s = { ...DEFAULTS, ...(config ?? {}) };
 
-	// 判定分层：preset 插件挂在 preset 的 standing scope 里（scope 有 parent）；
-	// profile 层在 root scope（无 parent）。拿不到 dsh-scope 时保守判为 profile 层（不遮蔽）。
+	// 判定分层：preset 插件挂在 generation scope（scopeOf 有值、但**没有 parent**）；
+	// profile 层在 root ctx（scopeOf 返回 undefined）。拿不到 dsh-scope 时保守判为 profile 层。
 	// __forceLayer 仅给 dryrun 用，生产上下文不会设它。
 	const forced = ctx?.__forceLayer;
 	const scopeKey = scopeApi?.scopeOf?.(ctx);
-	const isPresetLayer = forced === "preset" ? true
-		: forced === "profile" ? false
-		: !!scopeApi && scopeKey !== undefined && scopeApi.scopeParentOf?.(scopeKey) !== undefined;
+	const layer = layerFromScope(scopeKey, !!scopeApi, forced);
+	const isPresetLayer = layer === "preset";
 
 	if (!isPresetLayer) {
 		// ── profile 层：只注册状态查询与提示，不遮蔽、不写盘 ──
