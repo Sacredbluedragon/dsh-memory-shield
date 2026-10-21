@@ -1,4 +1,4 @@
-# dsh-preset-memory
+# dsh-memory-shield
 
 DSH preset 级**记忆遮蔽**工具集。一个 GitHub repo，两个独立 npm 包，按需组合。
 
@@ -6,12 +6,12 @@ DSH preset 级**记忆遮蔽**工具集。一个 GitHub repo，两个独立 npm 
 
 | 包名 | 定位 | 状态 |
 |---|---|---|
-| [`dsh-preset-memory`](./packages/shield/) | **纯遮蔽器** | ✅ 已发布 0.1.1（GitHub + npm）。挡住其他记忆插件往这个 preset 注入，让会话上下文干净。不自带记忆存储/写入/管理。默认关闭，装进 profile 不影响任何会话，只在目标 preset 里显式开。 |
-| [`dsh-preset-memory-memory`](./packages/memory-companion/) | **遮蔽会话记忆 companion** | 🚧 开发中，v0.2 计划。给遮蔽会话加上三轨/五轨记忆（存储层参考 [dsh-memory-evolve](https://github.com/csyangwen/dsh-memory-evolve)，作者 csyangwen）。当前只有 lib/ 与 manage.html，无入口文件，不能安装。 |
+| [`dsh-memory-shield`](./packages/shield/) | **纯遮蔽器** | ✅ 已发布 0.1.2（GitHub + npm）。挡住其他记忆插件往这个 preset 注入，让会话上下文干净。不自带记忆存储/写入/管理。默认关闭，装进 profile 不影响任何会话，只在目标 preset 里显式开。 |
+| [`dsh-memory-core`](./packages/memory-companion/) | **遮蔽会话记忆 companion** | 🚧 候选 0.1.0，未发布。给遮蔽会话加上三轨/五轨记忆（存储层参考 [dsh-memory-evolve](https://github.com/csyangwen/dsh-memory-evolve)，作者 csyangwen）。宿主半与面板已就位，待验收后发布。 |
 
 ## 用户怎么选
 
-- **只想挡其他记忆插件** → 只装 `dsh-preset-memory`（当前可用）
+- **只想挡其他记忆插件** → 只装 `dsh-memory-shield`（当前可用）
 - **想让遮蔽会话也有记忆** → 等 companion 发布后两个都装
 - **后来才想要记忆** → 再装 companion，shield 不动、配置不动、会话不丢
 
@@ -28,4 +28,4 @@ DSH preset 级**记忆遮蔽**工具集。一个 GitHub repo，两个独立 npm 
 
 ## 致谢
 
-- 记忆存储层（companion 包内，开发中）参考并抄录自 [csyangwen/dsh-memory-evolve](https://github.com/csyangwen/dsh-memory-evolve)，按 MIT 协议保留署名。
+- 记忆存储层（companion 包 `dsh-memory-core` 内）参考并抄录自 [csyangwen/dsh-memory-evolve](https://github.com/csyangwen/dsh-memory-evolve)，按 MIT 协议保留署名。

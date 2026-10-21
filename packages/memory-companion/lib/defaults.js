@@ -16,7 +16,7 @@ export const DEFAULTS = {
 /** 解析 memoryDir 落点。 */
 export function resolveMemoryDir(s) {
 	if (s.memoryDir) return s.memoryDir;
-	return process.env.DSH_PRESET_MEMORY_DIR || path.join(
+	return process.env.DSH_MEMORY_CORE_DIR || path.join(
 		process.env.DSH_HOME || path.join(os.homedir(), ".dsh"),
 		"..", ".dsh-plugin-data", s.presetName, "memory",
 	);

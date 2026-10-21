@@ -14,7 +14,7 @@ check("导出 apply/inject/name/Config",
 	typeof apply === "function" && Array.isArray(inject) && typeof name === "string" && typeof Config === "function");
 
 // 2. 常量
-check("插件名 = dsh-preset-memory", PLUGIN_NAME === "dsh-preset-memory", PLUGIN_NAME);
+check("插件名 = dsh-memory-shield", PLUGIN_NAME === "dsh-memory-shield", PLUGIN_NAME);
 
 // 3. 默认配置关键字段
 check("默认 enabled=false（bundle 形态装完不遮蔽）", DEFAULTS.enabled === false);

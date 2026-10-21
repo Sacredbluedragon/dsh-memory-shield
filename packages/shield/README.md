@@ -1,4 +1,4 @@
-# dsh-preset-memory
+# dsh-memory-shield
 
 **这是一个遮蔽器，不是记忆插件。**
 
@@ -8,7 +8,7 @@
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 > **插件信息**
-> - **名字**：dsh-preset-memory
+> - **名字**：dsh-memory-shield
 > - **定位**：DSH preset 级记忆遮蔽器——挡住其他记忆插件往这个 preset 里注入
 > - **默认状态**：bundle 形态装进 profile 后默认关闭（`enabled: false`），不遮蔽任何会话；在目标 preset 里显式写 `config.enabled: true` 才生效。
 > - **遮蔽范围**：默认覆盖 DSH 生态下载量前 8 的记忆插件（prime-memory / memory-eternal / meow-memory / memento / auto-memory / memory-palace / memoir 等）
@@ -71,7 +71,7 @@ surface prompt 一起灭掉。所以只能走同名遮蔽。
 **bundle 形态，装进 profile 也默认关闭，不影响任何会话。**
 
 ```bash
-dsh plugin --profile web add dsh-preset-memory
+dsh plugin --profile web add dsh-memory-shield
 ```
 
 装完是「已安装、未启用」：包里 `cordis.patch.yml` 那行带 `disabled: true`，插件不会被 apply，任何会话都不遮蔽。
@@ -80,8 +80,8 @@ dsh plugin --profile web add dsh-preset-memory
 
 ```yaml
 # 目标 preset 的 plugins 里加一项
-- id: preset-memory
-  name: 'dsh-preset-memory'
+- id: memory-shield
+  name: 'dsh-memory-shield'
   config:
     enabled: true
 ```
@@ -108,7 +108,7 @@ dsh plugin --profile web add dsh-preset-memory
         name: 我的遮蔽模式
         plugins:
           # ... 你需要的其他插件
-          - id: preset-memory
+          - id: memory-shield
             config:
               presetName: "my-shield"
 ```

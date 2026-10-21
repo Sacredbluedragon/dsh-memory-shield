@@ -1,7 +1,7 @@
 /**
  * 注入层：记忆注入渲染、预算分配、看门狗提醒拼接。
  */
-import { ENTRY_DELIMITER } from "./constants.js";
+import { ENTRY_DELIMITER } from "./store.js";
 import { TRACK_LABELS } from "./tracks.js";
 import { BUDGETS, TOTAL_BUDGET, KEY_TOP_N, KEY_SCAN_N, KEY_EXTRA_CAP, KEY_HOT_WORDS } from "./budgets.js";
 

@@ -65,7 +65,7 @@ export function shadowTool(toolName, _s) {
 export function shadowDiagnoseTool(ctx, s) {
 	return {
 		name: "shadow_diagnose",
-		description: "查看 preset-memory 当前遮蔽状态：遮蔽了多少工具、多少 context、哪些在白名单。",
+		description: "查看 memory-shield 当前遮蔽状态：遮蔽了多少工具、多少 context、哪些在白名单。",
 		parameters: { type: "object", properties: {} },
 		output: {
 			schema: {

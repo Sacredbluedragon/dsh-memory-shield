@@ -1,6 +1,6 @@
 {
-  "name": "dsh-preset-memory",
-  "version": "0.1.1",
+  "name": "dsh-memory-shield",
+  "version": "0.1.2",
   "description": "Universal memory shadow plugin for DSH: shadows other memory plugins' context and tools within a preset, giving that channel a clean context.",
   "type": "module",
   "main": "./index.js",
@@ -17,12 +17,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Sacredbluedragon/dsh-preset-memory.git"
+    "url": "git+https://github.com/Sacredbluedragon/dsh-memory-shield.git"
   },
   "bugs": {
-    "url": "https://github.com/Sacredbluedragon/dsh-preset-memory/issues"
+    "url": "https://github.com/Sacredbluedragon/dsh-memory-shield/issues"
   },
-  "homepage": "https://github.com/Sacredbluedragon/dsh-preset-memory#readme",
+  "homepage": "https://github.com/Sacredbluedragon/dsh-memory-shield#readme",
   "engines": {
     "node": ">=20",
     "dsh": ">=0.2.0-rc.1 <0.3.0-0"

@@ -2,6 +2,14 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 格式。
 
+## [0.1.2] - 2026-10-21
+
+### Changed
+- 改名：`dsh-preset-memory` → `dsh-memory-shield`。旧名点不出它到底做什么，「记忆遮蔽」才是本体，也不该绑死在 preset 上。
+- companion 包名改为 `dsh-memory-core`。
+- 插件 id 改为 `memory-shield`，诊断工具与内部路由同步改名。
+- 旧包 `dsh-preset-memory@0.1.1` 保留在 npm 上并标记 deprecated，指向本包。
+
 ## [0.1.1] - 2026-10-20
 
 ### Changed

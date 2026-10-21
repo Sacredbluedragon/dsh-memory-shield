@@ -1,5 +1,5 @@
 /**
- * dsh-preset-memory — memory storage layer.
+ * dsh-memory-shield — memory storage layer.
  *
  * 抄自 dsh-memory-evolve（作者 csyangwen）的 lib/store.js，做隔离适配：
  * 数据目录独立（遮蔽会话专用），与普通会话的 evolve 完全隔离。
@@ -251,7 +251,7 @@ export function withLock(dir, fn) {
     if (acquired) break
     if (isStaleLock(lockPath)) rmSync(lockPath, { force: true })
     if (Date.now() >= deadline) {
-      throw new Error('dsh-preset-memory: timed out waiting for the memory lock')
+      throw new Error('dsh-memory-shield: timed out waiting for the memory lock')
     }
     sleep(LOCK_RETRY_MS)
   }
@@ -393,7 +393,7 @@ export class MemoryStore {
         return { dir: join(this.dir, 'projects', projectHash(cwd)), file: 'memory.md' }
       }
       default:
-        throw new Error(`dsh-preset-memory: 无效的记忆轨 "${target}"`)
+        throw new Error(`dsh-memory-shield: 无效的记忆轨 "${target}"`)
     }
   }
 
@@ -401,7 +401,7 @@ export class MemoryStore {
   resolveTarget(target, agent) {
     const loc = this.locate(target, agent)
     if (!loc) {
-      throw new Error(`dsh-preset-memory: 无法定位记忆轨 "${target}"（项目记忆需要有效的会话工作目录）`)
+      throw new Error(`dsh-memory-shield: 无法定位记忆轨 "${target}"（项目记忆需要有效的会话工作目录）`)
     }
     return loc
   }
@@ -878,13 +878,13 @@ export class ArchiveStore {
     if (target === 'memory') return join(this.dir, 'memory-archive.md')
     if (target === 'user') return join(this.dir, 'user-archive.md')
     if (target === 'key') {
-      if (!cwd) throw new Error('dsh-preset-memory: key 归档需要会话工作目录')
+      if (!cwd) throw new Error('dsh-memory-shield: key 归档需要会话工作目录')
       return join(this.dir, 'projects', projectHash(cwd), 'key-archive.md')
     }
     if (typeof target === 'string' && target.startsWith('todo-')) {
       return join(this.dir, 'todo-archive.md')
     }
-    throw new Error(`dsh-preset-memory: 无效的归档轨 "${target}"`)
+    throw new Error(`dsh-memory-shield: 无效的归档轨 "${target}"`)
   }
 
   /** Read one archive track's entries; a missing file reads as empty. */
