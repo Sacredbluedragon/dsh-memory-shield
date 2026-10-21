@@ -1,6 +1,6 @@
 {
   "name": "dsh-memory-shield",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Universal memory shadow plugin for DSH: shadows other memory plugins' context and tools within a preset, giving that channel a clean context.",
   "type": "module",
   "main": "./index.js",
