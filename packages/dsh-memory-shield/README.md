@@ -4,7 +4,7 @@
 
 它不存记忆、不写文件、不提供新能力，只做遮蔽。
 
-![version](https://img.shields.io/badge/version-0.1.9-blue)
+![version](https://img.shields.io/badge/version-0.1.10-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 > [!IMPORTANT]
@@ -67,7 +67,6 @@ dsh plugin --profile web add dsh-memory-shield
 | `shadowSections` | `memory:snapshot` / `prompt:injections` | 按 context 段名精确遮蔽 |
 | `autoShadow` | `true` | 追加常见 `memory_*` / `memoir_*` 工具名与常见记忆 section |
 | `shadowWhitelist` | `[]` | 不遮蔽的名字（对精确与自动名单统一生效） |
-| `autoPresetFromSession` | `false` | 预留；当前内核没有 `ctx.session`，这条不生效 |
 | `hintDismissed` | `false` | 提示横幅是否已被关掉 |
 | `showInSettings` | `true` | 设置页是否也显示这块面板 |
 
@@ -78,7 +77,7 @@ dsh plugin --profile web add dsh-memory-shield
 - **工具**：2 个精确名 + 20 个自动名，共 22 个空桩；
 - **context**：`memory:snapshot` 空遮蔽 + `prompt:injections` + 8 个自动 section，共 10 个。
 
-自动名单覆盖 memory-evolve、memory-eternal、meow-memory、memory-palace、memento、auto-memory、prime-memory、memoir 这些插件常见的工具名与段名。
+自动名单覆盖 memory-evolve、memory-eternal、meow-memory、memory-palace、memento、auto-memory、prime-memory、memoir、dsh-memories、dsh-memo 这些插件常见的工具名与段名（共 10 个前缀，见 `lib/shadow.js` 的 `ALLOWED_PREFIXES`）。
 
 **改名单注意**：在 `cordis.patch.yml` 里写 `shadowTools` / `shadowSections` 会整块替换默认值，不深合并。要加名字，先把默认名单抄出来再追加。
 

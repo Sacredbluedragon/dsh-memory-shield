@@ -2,6 +2,20 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 格式。
 
+## [0.1.10] - 2026-10-22
+
+### Fixed
+- 「查看遮蔽状态」「帮我启用」两条提示词不再写死 `http://127.0.0.1:3080`，改用当前页面 origin 拼接，用户改过端口时也能直达。
+- 面板「作用范围」：preset 已挂载但 `enabled: false` 时显示「预设「X」已挂载，尚未启用」，不再与「未启用」徽章并排造成误读。
+- README 的自动名单补齐 `dsh-memories` / `dsh-memo` 两个前缀（实际共 10 个），按文档判断覆盖范围不再漏。
+
+### Removed
+- `autoPresetFromSession` 配置项：读的是 `ctx.session.header.agentPreset`，而内核把 preset 放在 session projection 里，这条从未生效。老配置里留着这个键不会报错（schema 不校验未知键），但已无任何作用。
+- `lib/defaults.js`、`lib/schema.js`、README 配置表同步删除该键。
+
+### Changed
+- `SHADOW_HINT` 与工具空壳文案：配套的 dsh-memory-core 已发布，提示从「尚未发布」改为「已发布，需要时可安装」。
+
 ## [0.1.9] - 2026-10-21
 
 ### Fixed

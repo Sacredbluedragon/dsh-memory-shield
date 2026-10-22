@@ -251,15 +251,6 @@ function apply(ctx, config) {
 
 	// ── preset 层：现有遮蔽逻辑 ──
 
-	// 自动从会话 preset 派生
-	if (s.autoPresetFromSession === true) {
-		const sessionPreset = ctx.session?.header?.agentPreset;
-		if (sessionPreset) {
-			s.presetName = sessionPreset;
-			ctx.logger.info(`${name}: auto preset from session: ${s.presetName}`);
-		}
-	}
-
 	// 端点先绑：enabled=false 时也要能查 health（报 enabled:false）
 	registerApi(ctx, 'preset', s, effective);
 

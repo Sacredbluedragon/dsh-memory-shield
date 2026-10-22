@@ -11,7 +11,6 @@ export const Config = z.object({
 	shadowSections: z.array(z.string()).default(DEFAULTS.shadowSections),
 	autoShadow: z.boolean().default(DEFAULTS.autoShadow),
 	shadowWhitelist: z.array(z.string()).default(DEFAULTS.shadowWhitelist),
-	autoPresetFromSession: z.boolean().default(DEFAULTS.autoPresetFromSession),
 	hintDismissed: z.boolean().default(DEFAULTS.hintDismissed),
 	showInSettings: z.boolean().default(DEFAULTS.showInSettings),
 });

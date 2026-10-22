@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+- 文案修正：旧名「companion」统一改为 `dsh-memory-core`（README、package.json 的 description 与 keywords、源码注释、日志前缀）。
+- README 补齐与 dsh-memory-shield 的配套关系、安装方式、数据目录与 `DSH_MEMORY_CORE_DIR` 说明。
+- 未改任何运行时行为。
+
 ## 0.1.0
 
 - 首版：按 preset 隔离的记忆包（与 dsh-memory-shield 配套）。
