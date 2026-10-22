@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "dsh-memory-core",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "遮蔽会话的隔离记忆包：给 dsh-memory-shield (shield) 遮蔽过的会话加一套独立记忆存储（独立数据目录，与 dsh-memory-evolve 完全隔离）。",
   "type": "module",
   "main": "./index.js",

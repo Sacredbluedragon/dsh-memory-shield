@@ -29,7 +29,9 @@ import { tracksOf, TRACK_FILES } from "./lib/tracks.js";
 // ── 依赖兜底 ────────────────────────────────────────────────────────────
 // index.js 末尾 `export { Config } from "./lib/schema.js"`，schema.js 依赖
 // @deepseek-ai/schemastery。dryrun 不应要求装依赖：该包缺失时注入一个最小
-// stub（链式 Proxy），只为让模块能求值，Config 本身不参与任何断言。
+// stub（链式 Proxy），只为让模块能求值。stub 是**严格**的：只认 schemastery
+// 真正导出的构造器与实例方法，遇到别的名字立即抛错——否则 `z.enum(...)` 这种
+// 只在 zod 里存在的写法会被万能 Proxy 吞掉，直到真机 import 才崩（0.1.1 事故）。
 const { createRequire } = nodeModule;
 const require = createRequire(import.meta.url);
 const register = nodeModule.register; // Node < 20.6 无此导出，故用命名空间取，避免具名导入直接报错
@@ -44,8 +46,21 @@ if (!depInstalled) {
     console.error("缺少 @deepseek-ai/schemastery，且当前 Node 不支持 module.register，无法继续。");
     process.exit(2);
   }
+  const ALLOWED = [
+    "object", "string", "number", "natural", "percent", "boolean", "array", "dict", "tuple",
+    "union", "intersect", "const", "never", "any", "function", "is", "date", "regexp",
+    "bitset", "arraybuffer", "transform", "default", "required", "description", "hidden", "deprecated",
+  ];
   const stub = "data:text/javascript," + encodeURIComponent(
-    "const chain = new Proxy(function () {}, { get: () => chain, apply: () => chain })\nexport default chain\n",
+    `const allowed = new Set(${JSON.stringify(ALLOWED)})\n` +
+      "const chain = new Proxy(function () {}, {\n" +
+      "  get(_t, key) {\n" +
+      "    if (typeof key === 'symbol') return undefined\n" +
+      "    if (!allowed.has(String(key))) throw new Error('stub: schemastery has no \"' + String(key) + '\"')\n" +
+      "    return chain\n" +
+      "  },\n" +
+      "  apply() { return chain },\n" +
+      "})\nexport default chain\n",
   );
   register("data:text/javascript," + encodeURIComponent(`
 export async function resolve(specifier, context, next) {
