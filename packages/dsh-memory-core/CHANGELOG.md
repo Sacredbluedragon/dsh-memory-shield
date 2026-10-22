@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.3
+
+- 修复：路由与注入段直接访问 `ctx.agent`。Cordis 的 `ctx.<服务>` 在插件未声明 `inject` 时会抛 `cannot get property "agent" without inject`，被 webserver 兜底成 **400 空体**：`/api/memory-core/status`、`/manage`、`/entries` 全部打不开，`memory-core:snapshot` 注入同时失效，日志里也没有堆栈。改为 `agentOf(ctx)`，只经 `ctx.get(name, false)` 探测（取不到返回 undefined；lite 三轨不依赖 agent）。
+- `_dryrun.mjs`：stub ctx 补 `get(name)`（模拟真实服务读取），并加 8d2 回归断言——`index.js` 里出现 `ctx.agent` 即失败。
+
 ## 0.1.2
 
 - 修复：`lib/schema.js` 用 `z.enum(...)`（zod 的写法，`@deepseek-ai/schemastery` 没有这个方法），包一 import 就抛 `TypeError: z.enum is not a function`。内核 Loader 的 `_init()` 捕获 import 错误后不建 fiber，于是 preset 里这一行只显示「never started」，日志里不落错。改为 `z.union([z.const("lite"), z.const("full")])`。

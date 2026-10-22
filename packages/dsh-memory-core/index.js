@@ -39,6 +39,17 @@ function sameOriginBlocked(req) {
 	return "";
 }
 
+/** 取当前会话的 agent。Cordis 的 ctx.<服务> 在未声明 inject 时会抛错，所以走 ctx.get(name, false) 探测；取不到返回 undefined。 */
+function agentOf(ctx) {
+	for (const name of ["agent", "agents"]) {
+		try {
+			const a = ctx.get?.(name, false);
+			if (a?.session) return a;
+		} catch {}
+	}
+	return undefined;
+}
+
 function apply(ctx, config) {
 	const s = { ...DEFAULTS, ...(config ?? {}) };
 	const memoryDir = resolveMemoryDir(s);
@@ -138,7 +149,7 @@ function apply(ctx, config) {
 			ctx.systemPrompt.context({
 				name: "memory-core:snapshot",
 				order: s.snapshotOrder,
-				text: () => renderSnapshot(store, s, writeGap, { agent: ctx.agent }),
+				text: () => renderSnapshot(store, s, writeGap, { agent: agentOf(ctx) }),
 			}),
 		`${name}: memory-core:snapshot inject`,
 	);
@@ -160,7 +171,8 @@ function apply(ctx, config) {
 						json(403, { ok: false, why: denied });
 						return;
 					}
-					const cwd = ctx.agent?.session?.header?.cwd;
+										const agent = agentOf(ctx);
+					const cwd = agent?.session?.header?.cwd;
 
 					// GET /manage —— 返回 manage.html 页面
 					if (req.method === "GET" && url.pathname === "/api/memory-core/manage") {
@@ -194,7 +206,7 @@ function apply(ctx, config) {
 					if (req.method === "GET" && url.pathname === "/api/memory-core/entries") {
 						const track = url.searchParams.get("track") || "memory";
 						try {
-							const entries = store.entriesOf(track, ctx.agent);
+							const entries = store.entriesOf(track, agent);
 							const pendingItems = pending.read().filter((p) => p.target === track);
 							const archived = archive.entriesOf(track, cwd);
 							json(200, { ok: true, data: { track, entries, pending: pendingItems, archived, count: entries.length } });
@@ -221,29 +233,29 @@ function apply(ctx, config) {
 								if (t === "key" && s.writeGuard) {
 									pending.append({ target: t, content, at: new Date().toISOString() });
 								} else {
-									const r = store.add(t, content, ctx.agent);
-									if (r?.ok !== false) markWrote(ctx.agent);
+									const r = store.add(t, content, agent);
+									if (r?.ok !== false) markWrote(agent);
 								}
 							} else if (action === "replace" || action === "edit" || action === "saveEdit") {
-								const r = store.replace(t, match || entry, content, ctx.agent);
-								if (r?.ok !== false) markWrote(ctx.agent);
+								const r = store.replace(t, match || entry, content, agent);
+								if (r?.ok !== false) markWrote(agent);
 							} else if (action === "delete" || action === "remove") {
-								store.remove(t, match || entry, ctx.agent);
+								store.remove(t, match || entry, agent);
 							} else if (action === "archive") {
 								// 先写归档、再删主轨（两步之间断掉也不丢内容）
 								archive.append(t, entry || match, cwd);
-								store.remove(t, match || entry, ctx.agent);
+								store.remove(t, match || entry, agent);
 							} else if (action === "confirm") {
 								// 待确认 → 正式写入；按内容匹配，不用前端索引（前端列表是过滤后的）
 								const items = pending.read();
 								const want = String(entry ?? "").trim();
 								const idx = items.findIndex((p) => String(p.content ?? "").trim() === want);
 								if (idx >= 0) {
-									const r = store.add(items[idx].target, items[idx].content, ctx.agent);
+									const r = store.add(items[idx].target, items[idx].content, agent);
 									if (r?.ok !== false) {
 										items.splice(idx, 1);
 										pending.write(items);
-										markWrote(ctx.agent);
+										markWrote(agent);
 									}
 								}
 							} else if (action === "reject") {
@@ -259,10 +271,10 @@ function apply(ctx, config) {
 								}
 							} else if (action === "promote") {
 								// 归档 → 移回主轨：先写主轨，写成功才删归档
-								const r = store.add(t, entry, ctx.agent);
+								const r = store.add(t, entry, agent);
 								if (r?.ok !== false) {
 									archive.removeExact(t, entry, cwd);
-									markWrote(ctx.agent);
+									markWrote(agent);
 								}
 							} else if (action === "removeArchive") {
 								archive.removeExact(t, entry, cwd);

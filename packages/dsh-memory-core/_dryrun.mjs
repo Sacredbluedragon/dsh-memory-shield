@@ -127,6 +127,8 @@ function makeCtx(agent) {
   const rec = { tools: [], injects: [], web: [], handlers: new Map(), effects: [], logs: [] };
   const ctx = {
     agent,
+    // 真实 Cordis：ctx.<服务> 未 inject 会抛，ctx.get(name, strict) 才安全。这里同样只经 get 拿 agent。
+    get: (name) => (name === "agent" || name === "agents" ? agent : undefined),
     logger: {
       info: (m) => rec.logs.push(String(m)),
       warn: (m) => rec.logs.push(String(m)),
@@ -428,6 +430,11 @@ try {
 
   onTurnStopping({ agent: agentA }); // gap = 2
   ok("8d gap=2 触发提醒", injectFn().includes(NOTICE), `含「${WRITE_GUARD_NOTICE.slice(0, 12)}…」`, injectFn().slice(0, 200));
+
+  // 回归闸：Cordis 的 ctx.<服务> 在未 inject 时会抛（cannot get property "x" without inject），
+  // 症状是路由一律 400 空体、注入段抛错。agent 只能经 ctx.get(name, false) 取。
+  const coreSrc = readFileSync(new URL("./index.js", import.meta.url), "utf8");
+  ok("8d2 index.js 不直接访问 ctx.agent", !/ctx\.agent\b/.test(coreSrc), "0 处", (coreSrc.match(/ctx\.agent\b/g) ?? []).length);
 
   await tool.execute({ action: "add", target: "memory", content: `看门狗清零 ${U("wd1")}` }, { agent: agentA });
   onTurnStopping({ agent: agentA }); // 写过记忆 → 下一回合 gap 清零
