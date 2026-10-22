@@ -6,7 +6,7 @@ DSH preset 级**记忆遮蔽**工具集。一个 GitHub repo，两个独立 npm 
 
 | 包名 | 定位 | 状态 |
 |---|---|---|
-| [`dsh-memory-shield`](./packages/shield/) | **纯遮蔽器** | ✅ 已发布 0.1.2（GitHub + npm）。挡住其他记忆插件往这个 preset 注入，让会话上下文干净。不自带记忆存储/写入/管理。默认关闭，装进 profile 不影响任何会话，只在目标 preset 里显式开。 |
+| [`dsh-memory-shield`](./packages/dsh-memory-shield/) | **纯遮蔽器** | ✅ 已发布 0.1.2（GitHub + npm）。挡住其他记忆插件往这个 preset 注入，让会话上下文干净。不自带记忆存储/写入/管理。默认关闭，装进 profile 不影响任何会话，只在目标 preset 里显式开。 |
 | [`dsh-memory-core`](./packages/memory-companion/) | **遮蔽会话记忆 companion** | 🚧 候选 0.1.0，未发布。给遮蔽会话加上三轨/五轨记忆（存储层参考 [dsh-memory-evolve](https://github.com/csyangwen/dsh-memory-evolve)，作者 csyangwen）。宿主半与面板已就位，待验收后发布。 |
 
 ## 用户怎么选
