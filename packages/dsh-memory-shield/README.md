@@ -4,7 +4,7 @@
 
 它不存记忆、不写文件、不提供新能力，只做遮蔽。
 
-![version](https://img.shields.io/badge/version-0.1.10-blue)
+![version](https://img.shields.io/badge/version-0.1.11-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 > [!IMPORTANT]

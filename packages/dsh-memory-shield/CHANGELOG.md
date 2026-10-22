@@ -2,6 +2,11 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 格式。
 
+## [0.1.11] - 2026-10-23
+
+### Changed
+- 遮蔽提示文案跟上现状：`SHADOW_HINT`、被遮蔽工具的描述与执行回执不再说「需要独立记忆时可安装」，改为「挂进同一 preset 即可用 `memory_core`」。原句在 core 已经装好的 preset 里会自相矛盾——提示让人去装一个已经在跑的东西。
+
 ## [0.1.10] - 2026-10-22
 
 ### Fixed
