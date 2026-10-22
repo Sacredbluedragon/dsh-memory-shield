@@ -1,6 +1,0 @@
-# dsh bundle patch: 插入本插件，装了就加载（默认不遮蔽，需要在 preset 里显式启用）。
-# profile 层实例只注册状态查询与提示，不遮蔽任何会话上下文。
-# 要用于某个 preset：在该 preset 的 plugins 里显式挂载本包，并设 config.enabled: true。
-- insert:
-    - id: memory-shield
-      name: 'dsh-memory-shield'
