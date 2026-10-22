@@ -25,7 +25,7 @@ const ALLOWED_EXACT = new Set([
  */
 export const SHADOW_HINT =
 	"本会话已启用记忆遮蔽：其他记忆插件注入的记忆已被拦截（数据未删除）。" +
-	"配套的 dsh-memory-core 尚未发布，当前无法安装。";
+	"配套的 dsh-memory-core 已发布，需要独立记忆时可安装。";
 
 export function isMemorySection(name) {
 	return ALLOWED_EXACT.has(name) || ALLOWED_PREFIXES.some((p) => name.startsWith(p));
@@ -55,7 +55,7 @@ export function shadowTool(toolName, _s) {
 	return {
 		name: toolName,
 		description:
-			"该工具在当前 preset 中已被遮蔽，不可用。配套的 dsh-memory-core 尚未发布，当前无法安装。",
+			"该工具在当前 preset 中已被遮蔽，不可用。配套的 dsh-memory-core 已发布，需要独立记忆时可安装。",
 		parameters: {
 			type: "object",
 			properties: {},
@@ -78,7 +78,7 @@ export function shadowTool(toolName, _s) {
 				ok: false,
 				message:
 					`工具 ${toolName} 在当前 preset 中不可用（已被记忆遮蔽插件接管）。` +
-					"配套的 dsh-memory-core 尚未发布，当前无法安装。",
+					"配套的 dsh-memory-core 已发布，需要独立记忆时可安装。",
 			};
 		},
 	};

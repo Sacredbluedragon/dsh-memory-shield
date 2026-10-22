@@ -70,7 +70,7 @@ window.__ModuleLoader__.load({
       return h("div", { "data-pmc-page": "" },
         h("div", { "data-pmc-head": "" },
           h("span", { "data-pmc-title": "" }, "遮蔽会话记忆"),
-          h("span", { "data-pmc-sub": "" }, "companion 模式 · 数据与普通会话完全隔离")),
+          h("span", { "data-pmc-sub": "" }, "记忆核心 · 数据与普通会话完全隔离")),
         h("div", { "data-pmc-sec": "" },
           h("div", { "data-pmc-row": "" },
             h("span", { "data-pmc-name": "" }, "当前模式"),

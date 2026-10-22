@@ -27,7 +27,7 @@ window.__ModuleLoader__.load({
 
 // 三段「引导型」提示词：只让 agent 读懂并汇报，明确禁止代改配置。
     const COPY_UNDERSTAND = '我刚装了 dsh-memory-shield，帮我读它的 README 再告诉我它是干什么的、怎么用。README 在当前 DSH profile 的 node_modules/dsh-memory-shield/README.md（profile 名按实际，通常是 web；不确定就先看插件装在哪个 profile，再读那个目录），路径不对就用文件名搜一下，别猜。用通俗语言讲三点：它遮蔽了什么、只影响哪些会话、默认为什么是关的。不要帮我改配置。'
-    const COPY_COMPANION = 'dsh-memory-shield 有个配套包 dsh-memory-core，我想知道它是干什么的。它尚未发布、当前不可安装，不要安装、也不要 npm 搜包安装：如果本机没有它的源码目录，就直接按 dsh-memory-shield README 里提到它的地方，用一句话告诉我它和 shield 是什么关系、我什么时候才需要它。不要帮我装东西或改配置。'
+    const COPY_MEMORY_CORE = 'dsh-memory-shield 有个配套包 dsh-memory-core（隔离记忆包），我想知道它是干什么的、什么时候需要它。帮我读它的 README：先找本机 DSH profile 的 node_modules/dsh-memory-core/README.md（profile 名按实际，通常是 web），找不到再看 GitHub 仓库 Sacredbluedragon/dsh-memory-shield 的 packages/dsh-memory-core。用通俗语言讲清它和 shield 的关系、记忆存在哪、怎么启用。不要帮我安装或改配置。'
     const COPY_DIAGNOSE = '帮我看看记忆遮蔽现在是什么状态。先试调用 shadow_diagnose 工具；如果它不存在（报 unknown tool），说明当前会话没挂 dsh-memory-shield，就改用只读接口 http://127.0.0.1:3080/api/memory-shield/state 和 /health 看（端口不对就用浏览器地址栏那个端口），再把两边对不上的地方说清楚。并说明这是哪一层看的、这个会话本身是不是被遮蔽的通道。两个来源的数字口径不同（工具报配置数组长度、/health 报去重后的实际生效数），不要当成不一致。然后用一句话告诉我这个状态意味着什么、我下一步要不要启用。不要帮我改任何配置。'
     const COPY_HELP = '我不太懂 dsh-memory-shield 这个记忆遮蔽插件，想用它。请分步带我，先只做只读检查，等我明确确认后再动手：①用 GET 查 http://127.0.0.1:3080/api/memory-shield/state 和 /health（端口不对就用浏览器地址栏那个），告诉我它现在装在哪一层、有没有启用、挂在哪个 preset（以 /state 的 layer 和 presetName 为准；layer 是 profile 且 enabled 为 false，就是装了但没挂到任何 preset，等于没启用）；②先确认我要用的那个 preset 存在（在 profile 的 cordis.patch.yml 里能找到），再告诉我启用要改哪个文件、改在哪儿：必须是在已有 preset 的 plugins 列表里插一项 - id: memory-shield / name: dsh-memory-shield / config: {enabled: true}，不要新写一个同名 preset 块（preset 的 config 是整体替换，会把其余插件清掉），也不要加到 dsh.profile.bundles 或 profile 层（会和全局记忆插件撞名）；顺便说清影响：只有那个 preset 下的会话看不到记忆、其他会话照旧、消息级注入挡不住、要重启并新建该 preset 的会话才生效；③默认复用现成的 preset，遮蔽名单用默认的就行（已覆盖常见记忆插件），只有我装了名单外的插件时才问我；④我确认后再动手：改前把 cordis.patch.yml 备份到同目录（文件名加 .bak 和时间戳），只改这一处，改完把「改了哪个文件+备份在哪+重启方式（按这台机器的正常习惯，但不要由你执行重启，会把当前会话掐掉）+新建哪个会话+进去后怎么验证」列给我。'
     const COPY_HINT = '复制后粘贴到对话框，发给 agent。'
@@ -198,7 +198,7 @@ function CopyButton(props) {
           h('div', { 'data-ms-explain-line': '' },
             '什么时候用：想让某个窗口或通道不带记忆时用，比如给别人演示、或者要保持干净的服务窗口。'),
           h('div', { 'data-ms-explain-line': '' },
-            '想在这些会话里有自己的记忆：装配套包 dsh-memory-core（尚未发布，暂不可安装）。')),
+            '想在这些会话里有自己的记忆：装配套包 dsh-memory-core（已发布 0.1.0，可安装）。')),
 
         h('div', { 'data-ms-sec': '' },
           h('span', { 'data-ms-sec-title': '' }, '状态'),
@@ -227,7 +227,7 @@ function CopyButton(props) {
           h(CopyButton, { label: '了解这个插件', text: COPY_UNDERSTAND }),
           h(CopyButton, { label: '帮我启用', text: COPY_HELP }),
           h(CopyButton, { label: '查看遮蔽状态', text: COPY_DIAGNOSE }),
-          h(CopyButton, { label: '了解配套记忆包', text: COPY_COMPANION })),
+          h(CopyButton, { label: '了解配套记忆包', text: COPY_MEMORY_CORE })),
         h('div', { 'data-ms-sec': '' },
           h('span', { 'data-ms-sec-title': '' }, '显示'),
           h('label', { 'data-ms-row': '', style: { cursor: 'pointer' } },

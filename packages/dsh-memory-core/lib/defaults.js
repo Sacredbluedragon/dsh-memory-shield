@@ -1,5 +1,5 @@
 /**
- * 默认配置（companion 版）。
+ * 默认配置（dsh-memory-core 版）。
  */
 import path from "node:path";
 import os from "node:os";

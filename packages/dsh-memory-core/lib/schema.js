@@ -1,5 +1,5 @@
 /**
- * schemastery schema（companion 记忆版）。
+ * schemastery schema（dsh-memory-core 记忆版）。
  */
 import z from "@deepseek-ai/schemastery";
 import { DEFAULTS } from "./defaults.js";

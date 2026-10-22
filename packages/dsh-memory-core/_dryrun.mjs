@@ -11,7 +11,7 @@
  *   - 每项失败打印「期望 / 实际」；
  *   - 代码能力缺失的项不打空断言，改用 note 明示（见文件末尾说明）。
  *
- * 跑法：把本文件放在 packages/memory-companion/ 下，在该目录执行 `node _dryrun.mjs`。
+ * 跑法：把本文件放在 packages/dsh-memory-core/ 下，在该目录执行 `node _dryrun.mjs`。
  */
 
 import * as nodeModule from "node:module";

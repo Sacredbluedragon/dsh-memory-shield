@@ -1,9 +1,9 @@
 # dsh-memory-core
 
-遮蔽会话的 companion 记忆包。与 [dsh-memory-shield (shield)](../dsh-memory-shield/) 配对使用：
+遮蔽会话的隔离记忆包。与 [dsh-memory-shield (shield)](../dsh-memory-shield/) 配对使用：
 
 - **shield 包**：挡住其他记忆插件（dsh-memory-evolve 等）的注入和工具，让指定 preset 的会话拥有干净的上下文。
-- **companion 包**：给被遮蔽的会话加一套隔离的记忆存储——独立数据目录、独立工具、独立面板，与普通会话的 dsh-memory-evolve 完全隔离。
+- **`dsh-memory-core` 包**：给被遮蔽的会话加一套隔离的记忆存储——独立数据目录、独立工具、独立面板，与普通会话的 dsh-memory-evolve 完全隔离。
 
 ## 安装
 
@@ -17,7 +17,7 @@ dsh plugin --profile web add dsh-memory-core
 2. 找到 `id: memory-core` 那一段，把 `disabled: true` 改成 `disabled: false`，或直接删掉这一行。
 3. 完全退出并重启 DSH，再新建会话。
 
-前提：已安装 `dsh-memory-shield`（shield 包）。两包配对时建议只把 companion 挂进需要独立记忆的那个 preset，不要放进全局 `dsh.profile.bundles`。
+前提：已安装 `dsh-memory-shield`（shield 包）。两包配对时建议只把 `dsh-memory-core` 挂进需要独立记忆的那个 preset，不要放进全局 `dsh.profile.bundles`。
 
 ## 配置
 

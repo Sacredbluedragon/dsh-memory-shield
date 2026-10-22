@@ -1,5 +1,5 @@
 /**
- * dsh-memory-core —— 遮蔽会话的 companion 记忆包。
+ * dsh-memory-core —— 遮蔽会话的隔离记忆包。
  *
  * 与 shield 包配对使用：shield 挡住其他记忆插件的注入，本包给遮蔽会话加一套
  * 隔离的记忆存储（独立数据目录，与普通会话的 dsh-memory-evolve 完全隔离）。
@@ -283,7 +283,7 @@ function apply(ctx, config) {
 	);
 
 	ctx.logger.info(
-		`${name}: companion active — mode=${s.memoryTracks}, dir=${memoryDir}, tracks=${tracksOf(s.memoryTracks).join("/")}`,
+		`${name}: memory-core active — mode=${s.memoryTracks}, dir=${memoryDir}, tracks=${tracksOf(s.memoryTracks).join("/")}`,
 	);
 }
 

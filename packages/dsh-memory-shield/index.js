@@ -2,7 +2,7 @@
  * dsh-memory-shield — 通用记忆遮蔽插件（纯遮蔽器，无面板）。
  *
  * 在指定 preset 内遮蔽其他记忆插件的注入和工具，让这个通道拥有干净的上下文。
- * 本插件不自带任何记忆存储/写入/管理能力——记忆是可选 companion 插件的事。
+ * 本插件不自带任何记忆存储/写入/管理能力——记忆是可选 dsh-memory-core 包的事。
  * 查看遮蔽状态：让 agent 调用 shadow_diagnose 工具，或 GET /api/memory-shield/health。
  *
  * 分层：
