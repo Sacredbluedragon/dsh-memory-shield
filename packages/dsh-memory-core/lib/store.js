@@ -357,12 +357,15 @@ export class MemoryStore {
    * @param {boolean} [options.entryDatePrefix=true] - stamp entries with a
    *   `[YYYY-MM-DD] ` prefix on add.
    * @param {'off'|'on'} [options.entryIdMode='off'] - 条目身份证开关。
+   * @param {'lite'|'full'} [options.memoryTracks='lite'] - lite 三轨 / full 五轨；
+   *   key 轨是否按项目隔离也看它（lite 全局、full 按 cwd）。
    */
   constructor(dir, options = {}) {
     this.dir = dir
     this.injectionScan = options.injectionScan ?? true
     this.entryDatePrefix = options.entryDatePrefix ?? true
     this.entryIdMode = options.entryIdMode === 'on' ? 'on' : 'off'
+    this.memoryTracks = options.memoryTracks === 'full' ? 'full' : 'lite'
   }
 
   /**
@@ -380,8 +383,8 @@ export class MemoryStore {
         return { dir: join(this.dir, 'daily'), file: `${todayStamp()}.md` }
       case 'key':
         // lite 模式：preset 级全局关键事实（根目录 key.md，无需 cwd）
-        if (this.entryIdMode !== 'on') return { dir: this.dir, file: 'key.md' }
-        // full 模式：项目隔离（对齐 evolve projects/<hash>/KEY.md）
+        // full 模式：按 cwd 项目隔离（对齐 evolve projects/<hash>/KEY.md）
+        if (this.memoryTracks !== 'full') return { dir: this.dir, file: 'key.md' }
         {
           const cwd = agent?.session?.header?.cwd
           if (!cwd) return undefined

@@ -6,10 +6,10 @@ import { TRACK_LABELS } from "./tracks.js";
 import { BUDGETS, TOTAL_BUDGET, KEY_TOP_N, KEY_SCAN_N, KEY_EXTRA_CAP, KEY_HOT_WORDS } from "./budgets.js";
 
 export const WRITE_GUIDE =
-	"## 每轮收尾\n用 memory 工具写一条：重要事实写 `key`，用户偏好写 `user`，长期记忆写 `memory`。";
+	"## 每轮收尾\n用 memory_core 工具写一条：重要事实写 `key`，用户偏好写 `user`，长期记忆写 `memory`。";
 
 export const WRITE_GUARD_NOTICE =
-	"## 提醒\n你连着几个回合没写记忆了。收尾时记得用 memory 工具写一条：重要事实写 `key`，" +
+	"## 提醒\n你连着几个回合没写记忆了。收尾时记得用 memory_core 工具写一条：重要事实写 `key`，" +
 	"用户偏好写 `user`，长期记忆写 `memory`。";
 
 /** 截断后清理开头的孤立分隔符残留。 */

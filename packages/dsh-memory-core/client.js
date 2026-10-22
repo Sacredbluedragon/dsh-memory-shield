@@ -40,21 +40,17 @@ window.__ModuleLoader__.load({
 
       const load = React.useCallback(async () => {
         try {
-          // 拉各轨条数
+          // 拉各轨条数 + 待确认（后端没有 /pending，pending 挂在 /entries 的返回里）
           const tracks = TRACKS_LITE; // 默认 lite，full 模式需要切配置
           const counts = {};
+          let pendingCount = 0;
           for (const t of tracks) {
             try {
               const j = await jget(`/entries?track=${t}`);
               counts[t] = j.ok ? j.data.count : 0;
+              if (j.ok && Array.isArray(j.data.pending)) pendingCount += j.data.pending.length;
             } catch { counts[t] = 0; }
           }
-          // 拉待确认
-          let pendingCount = 0;
-          try {
-            const p = await jget("/pending");
-            pendingCount = p.ok ? p.data.count : 0;
-          } catch {}
           setSt({ counts, pendingCount, tracks });
           setErr("");
         } catch (e) {

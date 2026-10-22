@@ -1,6 +1,6 @@
 # dsh-memory-core
 
-遮蔽会话的 companion 记忆包。与 [dsh-memory-shield (shield)](../shield/) 配对使用：
+遮蔽会话的 companion 记忆包。与 [dsh-memory-shield (shield)](../dsh-memory-shield/) 配对使用：
 
 - **shield 包**：挡住其他记忆插件（dsh-memory-evolve 等）的注入和工具，让指定 preset 的会话拥有干净的上下文。
 - **companion 包**：给被遮蔽的会话加一套隔离的记忆存储——独立数据目录、独立工具、独立面板，与普通会话的 dsh-memory-evolve 完全隔离。
@@ -11,7 +11,13 @@
 dsh plugin --profile web add dsh-memory-core
 ```
 
-前提：已安装 `dsh-memory-shield`（shield 包）。
+装完还要**手动启用一次**：包默认是关闭的（`cordis.patch.yml` 里 `disabled: true`），不启用的话重启后没有工具、没有记忆注入、面板也是空的，而且不报错。
+
+1. 打开 `%USERPROFILE%\.dsh\profiles\web\cordis.patch.yml`（macOS/Linux 下是 `~/.dsh/profiles/web/cordis.patch.yml`）。
+2. 找到 `id: memory-core` 那一段，把 `disabled: true` 改成 `disabled: false`，或直接删掉这一行。
+3. 完全退出并重启 DSH，再新建会话。
+
+前提：已安装 `dsh-memory-shield`（shield 包）。两包配对时建议只把 companion 挂进需要独立记忆的那个 preset，不要放进全局 `dsh.profile.bundles`。
 
 ## 配置
 
@@ -22,7 +28,7 @@ dsh plugin --profile web add dsh-memory-core
 | `memoryDir` | `""` | 记忆数据目录（留空自动解析到 `~/.dsh-plugin-data/<presetName>/memory/`） |
 | `writeGuard` | `true` | key 轨写入走待确认队列（防误写） |
 | `writeGuardThreshold` | `2` | 连续 N 轮没写记忆就提醒 |
-| `snapshotOrder` | `500` | memory:snapshot 注入顺序 |
+| `snapshotOrder` | `500` | memory-core:snapshot 注入顺序 |
 
 ## 记忆轨
 
@@ -47,14 +53,14 @@ dsh plugin --profile web add dsh-memory-core
 
 ## 工具
 
-注册了一个 `memory` 工具，agent 可在遮蔽会话里调用：
+注册了一个 `memory_core` 工具，agent 可在遮蔽会话里调用：
 
 ```
-memory action=add target=memory content="用户喜欢用中文回复"
-memory action=list target=user
-memory action=replace target=key match="旧内容" content="新内容"
-memory action=remove target=memory match="要删的子串"
-memory action=archive target=user match="要归档的子串"
+memory_core action=add target=memory content="用户喜欢用中文回复"
+memory_core action=list target=user
+memory_core action=replace target=key match="旧内容" content="新内容"
+memory_core action=remove target=memory match="要删的子串"
+memory_core action=archive target=user match="要归档的子串"
 ```
 
 ## 面板
@@ -68,15 +74,15 @@ memory action=archive target=user match="要归档的子串"
 
 ## 与 dsh-memory-evolve 的关系
 
-- 本包的存储层（`lib/store.js`）**参考并借鉴了 [dsh-memory-evolve](https://github.com/csyangwen/dsh-memory-evolve)**（作者 csyangwen）的实现，做了隔离适配：数据目录独立、工具名独立、注入 section 同名（`memory:snapshot`）但内容是自己的。
+- 本包的存储层（`lib/store.js`）**参考并借鉴了 [dsh-memory-evolve](https://github.com/csyangwen/dsh-memory-evolve)**（作者 csyangwen）的实现，做了隔离适配：数据目录独立、工具名独立、注入 section 同名（`memory-core:snapshot`）但内容是自己的。
 - 普通会话的 dsh-memory-evolve 面板看不到遮蔽会话的记忆，反之亦然。
 - 如果用户想要完整的五轨记忆 + 待确认审查 + 合并梳理，可以在普通会话里装 dsh-memory-evolve，本包只负责给遮蔽会话提供最小可用的记忆能力。
 
 ## 目录结构
 
 ```
-packages/memory-companion/
-├── index.js          # 插件入口（memory 工具 + snapshot 注入 + webServer API）
+packages/dsh-memory-core/
+├── index.js          # 插件入口（memory_core 工具 + snapshot 注入 + webServer API）
 ├── client.js         # 插件详情页小面板
 ├── manage.html       # 独立窗口记忆管理页
 ├── package.json

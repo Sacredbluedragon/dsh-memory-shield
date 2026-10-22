@@ -444,7 +444,7 @@
         }
         const source =
           op === "delete" || op === "archive" ? state.cache[track].entries[index]
-          : op === "confirm" || op === "reject" ? state.cache[track].pending[index].entry
+          : op === "confirm" || op === "reject" ? state.cache[track].pending[index].content
           : op === "promote" || op === "removeArchive" ? state.cache[track].archived[index]
           : undefined;
         if (source === undefined) return;

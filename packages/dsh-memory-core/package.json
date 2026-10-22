@@ -1,0 +1,68 @@
+{
+  "name": "dsh-memory-core",
+  "version": "0.1.0",
+  "description": "遮蔽会话的 companion 记忆包：给 dsh-memory-shield (shield) 遮蔽过的会话加一套隔离的记忆存储（独立数据目录，与 dsh-memory-evolve 完全隔离）。",
+  "type": "module",
+  "main": "./index.js",
+  "license": "MIT",
+  "author": "Sacredbluedragon",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "preset",
+    "memory",
+    "companion",
+    "isolated"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sacredbluedragon/dsh-memory-shield.git",
+    "directory": "packages/dsh-memory-core"
+  },
+  "bugs": {
+    "url": "https://github.com/Sacredbluedragon/dsh-memory-shield/issues"
+  },
+  "homepage": "https://github.com/Sacredbluedragon/dsh-memory-shield/tree/main/packages/dsh-memory-core#readme",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./manage.html": "./manage.html",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "manage.html",
+    "lib/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "cordis.patch.yml"
+  ],
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.2.0-rc.1 <0.3.0-0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/schemastery": "^3.18.4"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh": {
+      "optional": true
+    }
+  }
+}

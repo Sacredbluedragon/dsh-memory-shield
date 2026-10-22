@@ -19,81 +19,128 @@ import { fileURLToPath } from "node:url";
 const name = PLUGIN_NAME;
 const inject = ["systemPrompt", "tools", "webServer"];
 
+const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
+
+/** 同源守卫：挡 DNS 重绑定与跨站请求；返回空串表示放行 */
+function sameOriginBlocked(req) {
+	const host = String(req.headers?.host ?? "").split(":")[0];
+	const origin = req.headers?.origin;
+	if (origin) {
+		let oh = "";
+		try {
+			oh = new URL(origin).hostname;
+		} catch {
+			return "非法 Origin 头";
+		}
+		if (oh !== host && !(LOOPBACK.has(host) && LOOPBACK.has(oh))) return "跨源访问被拒绝";
+	}
+	const site = req.headers?.["sec-fetch-site"];
+	if (!origin && site && site !== "same-origin" && site !== "none") return "跨站请求被拒绝";
+	return "";
+}
+
 function apply(ctx, config) {
 	const s = { ...DEFAULTS, ...(config ?? {}) };
 	const memoryDir = resolveMemoryDir(s);
 	if (!existsSync(memoryDir)) mkdirSync(memoryDir, { recursive: true });
 
-	const store = new MemoryStore(memoryDir, { injectionScan: true });
+	const store = new MemoryStore(memoryDir, { injectionScan: true, memoryTracks: s.memoryTracks });
 	const pending = new SuggestionQueue(join(memoryDir, PENDING_FILE));
 	const archive = new ArchiveStore(memoryDir);
 
-	// ── memory 工具 ──────────────────────────────────────────────
+	// ── memory_core 工具 ────────────────────────────────────────
+	const writeGap = writeGapCounter(ctx, () => s.writeGuard === true);
+	/** 写入成功后清 gap，否则看门狗每轮都会提醒「没写记忆」 */
+	const markWrote = (agent) => {
+		try {
+			writeGap?.noteWrite?.(agent);
+		} catch {}
+	};
+
 	const memoryTool = {
-		name: "memory",
+		name: "memory_core",
 		description:
-			"读写遮蔽会话的隔离记忆。target 可选：memory（长期记忆）、user（用户偏好）、key（关键事实）、project（项目记忆，需 full 模式）、daily（每日日志，需 full 模式）。",
+			"读写遮蔽会话的隔离记忆（与全局 memory 工具互不影响）。target 可选：memory（长期记忆）、user（用户偏好）、key（关键事实，需确认）、project（项目记忆，需 full 模式）、daily（每日日志，需 full 模式）。",
 		parameters: {
 			type: "object",
 			properties: {
 				action: { type: "string", enum: ["add", "list", "replace", "remove", "archive"], description: "操作" },
 				target: { type: "string", enum: ["memory", "user", "key", "project", "daily"], description: "记忆轨" },
 				content: { type: "string", description: "新内容（add/replace 时必填）" },
-				match: { type: "string", description: "匹配子串（replace/remove 时必填）" },
+				match: { type: "string", description: "匹配子串（replace/remove/archive 时必填）" },
 			},
 			required: ["action", "target"],
 		},
-		async call({ action, target, content, match }, ctx2) {
+		output: {
+			schema: {
+				type: "object",
+				additionalProperties: false,
+				properties: {
+					ok: { type: "boolean" },
+					message: { type: "string" },
+					target: { type: "string" },
+					entries: { type: "array", items: { type: "string" } },
+					count: { type: "integer" },
+					queued: { type: "boolean" },
+				},
+				required: ["ok", "message"],
+			},
+			render: (_args, value) => [{ type: "text", text: value.message || (value.ok ? "ok" : "failed") }],
+		},
+		async execute({ action, target, content, match }, exec) {
 			try {
 				if (action === "list") {
-					const entries = store.entriesOf(target, ctx2.agent);
-					return { ok: true, data: { target, entries, count: entries.length } };
+					const entries = store.entriesOf(target, exec?.agent);
+					return { ok: true, message: `${target} 轨 ${entries.length} 条`, target, entries, count: entries.length };
 				}
 				if (action === "add") {
-					if (!content) return { ok: false, why: "add 需要 content" };
+					if (!content) return { ok: false, message: "add 需要 content", target };
 					// key 轨走待确认队列
 					if (target === "key" && s.writeGuard) {
 						pending.append({ target, content, at: new Date().toISOString() });
-						return { ok: true, data: { queued: true, note: "已加入待确认队列，用户确认后生效。" } };
+						return { ok: true, message: "已加入待确认队列，用户确认后生效。", target, queued: true };
 					}
-					store.add(target, content, ctx2.agent);
-					return { ok: true, data: { added: true } };
+					const r = store.add(target, content, exec?.agent);
+					if (r?.ok !== false) markWrote(exec?.agent);
+					return { ok: r?.ok !== false, message: r?.message || `已写入 ${target}`, target };
 				}
 				if (action === "replace") {
-					if (!match || !content) return { ok: false, why: "replace 需要 match 和 content" };
-					store.replace(target, match, content, ctx2.agent);
-					return { ok: true, data: { replaced: true } };
+					if (!match || !content) return { ok: false, message: "replace 需要 match 和 content", target };
+					const r = store.replace(target, match, content, exec?.agent);
+					if (r?.ok !== false) markWrote(exec?.agent);
+					return { ok: r?.ok !== false, message: r?.message || `已替换 ${target}`, target };
 				}
 				if (action === "remove") {
-					if (!match) return { ok: false, why: "remove 需要 match" };
-					store.remove(target, match, ctx2.agent);
-					return { ok: true, data: { removed: true } };
+					if (!match) return { ok: false, message: "remove 需要 match", target };
+					const r = store.remove(target, match, exec?.agent);
+					return { ok: r?.ok !== false, message: r?.message || `已删除 ${target}`, target };
 				}
 				if (action === "archive") {
-					if (!match) return { ok: false, why: "archive 需要 match" };
-					// 先从主轨移除，再追加到归档
-					const removed = store.remove(target, match, ctx2.agent);
-					if (removed?.ok !== false) {
-						archive.append(target, removed?.removed || match, ctx2.agent?.session?.header?.cwd);
-					}
-					return { ok: true, data: { archived: true } };
+					if (!match) return { ok: false, message: "archive 需要 match", target };
+					// 先写归档、再删主轨：两步之间断掉也不会丢内容
+					const peek = store.peek(target, match, exec?.agent);
+					if (peek?.ok === false) return { ok: false, message: peek.message || "找不到要归档的条目", target };
+					archive.append(target, peek.entry, exec?.agent?.session?.header?.cwd);
+					const r = store.remove(target, match, exec?.agent);
+					return { ok: r?.ok !== false, message: r?.message || `已归档 ${target}`, target };
 				}
-				return { ok: false, why: `未知 action: ${action}` };
+				return { ok: false, message: `未知 action: ${action}`, target };
 			} catch (e) {
-				return { ok: false, why: e?.message ?? String(e) };
+				return { ok: false, message: e?.message ?? String(e), target };
 			}
 		},
 	};
 	ctx.effect(() => ctx.tools.register(memoryTool), `${name}: memory tool`);
 
-	// ── memory:snapshot 注入 ────────────────────────────────────
-	const writeGap = writeGapCounter(ctx, () => s.writeGuard === true);
+	// ── memory-core:snapshot 注入 ──────────────────────────────
 	ctx.effect(
 		() =>
-			ctx.systemPrompt.inject("memory:snapshot", () => renderSnapshot(store, s, writeGap, { agent: ctx.agent }), {
+			ctx.systemPrompt.context({
+				name: "memory-core:snapshot",
 				order: s.snapshotOrder,
+				text: () => renderSnapshot(store, s, writeGap, { agent: ctx.agent }),
 			}),
-		`${name}: memory:snapshot inject`,
+		`${name}: memory-core:snapshot inject`,
 	);
 
 	// ── webServer API ───────────────────────────────────────────
@@ -108,6 +155,11 @@ function apply(ctx, config) {
 						res.writeHead(code, { "content-type": "application/json" });
 						res.end(JSON.stringify(data));
 					};
+					const denied = sameOriginBlocked(req);
+					if (denied) {
+						json(403, { ok: false, why: denied });
+						return;
+					}
 					const cwd = ctx.agent?.session?.header?.cwd;
 
 					// GET /manage —— 返回 manage.html 页面
@@ -169,36 +221,49 @@ function apply(ctx, config) {
 								if (t === "key" && s.writeGuard) {
 									pending.append({ target: t, content, at: new Date().toISOString() });
 								} else {
-									store.add(t, content, ctx.agent);
+									const r = store.add(t, content, ctx.agent);
+									if (r?.ok !== false) markWrote(ctx.agent);
 								}
 							} else if (action === "replace" || action === "edit" || action === "saveEdit") {
-								store.replace(t, match || entry, content, ctx.agent);
+								const r = store.replace(t, match || entry, content, ctx.agent);
+								if (r?.ok !== false) markWrote(ctx.agent);
 							} else if (action === "delete" || action === "remove") {
 								store.remove(t, match || entry, ctx.agent);
 							} else if (action === "archive") {
+								// 先写归档、再删主轨（两步之间断掉也不丢内容）
+								archive.append(t, entry || match, cwd);
 								store.remove(t, match || entry, ctx.agent);
-								archive.append(t, match || entry, cwd);
 							} else if (action === "confirm") {
-								// 待确认 → 正式写入
+								// 待确认 → 正式写入；按内容匹配，不用前端索引（前端列表是过滤后的）
 								const items = pending.read();
-								const idx = Number(index);
-								if (items[idx]) {
-									store.add(items[idx].target, items[idx].content, ctx.agent);
-									items.splice(idx, 1);
-									pending.write(items);
+								const want = String(entry ?? "").trim();
+								const idx = items.findIndex((p) => String(p.content ?? "").trim() === want);
+								if (idx >= 0) {
+									const r = store.add(items[idx].target, items[idx].content, ctx.agent);
+									if (r?.ok !== false) {
+										items.splice(idx, 1);
+										pending.write(items);
+										markWrote(ctx.agent);
+									}
 								}
 							} else if (action === "reject") {
-								// 待确认 → 删除
+								// 待确认 → 删除；同样按内容匹配
 								const items = pending.read();
-								const idx = Number(index);
-								if (items[idx] !== undefined) {
+								const want = String(entry ?? "").trim();
+								const idx = items.findIndex(
+									(p) => p.target === t && String(p.content ?? "").trim() === want,
+								);
+								if (idx >= 0) {
 									items.splice(idx, 1);
 									pending.write(items);
 								}
 							} else if (action === "promote") {
-								// 归档 → 移回主轨
-								store.add(t, entry, ctx.agent);
-								archive.removeExact(t, entry, cwd);
+								// 归档 → 移回主轨：先写主轨，写成功才删归档
+								const r = store.add(t, entry, ctx.agent);
+								if (r?.ok !== false) {
+									archive.removeExact(t, entry, cwd);
+									markWrote(ctx.agent);
+								}
 							} else if (action === "removeArchive") {
 								archive.removeExact(t, entry, cwd);
 							} else {
