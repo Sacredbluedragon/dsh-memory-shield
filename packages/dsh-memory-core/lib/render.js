@@ -1,18 +1,40 @@
 /**
  * 注入层：记忆注入渲染、预算分配、看门狗提醒拼接。
+ *
+ * 形制对齐 dsh-memory-evolve：
+ * - 每轨一个 `## 标签`，其下逐条 `- ` 开头，标题与正文一一对应（不再把所有正文拼在末尾）；
+ * - key 只注入一次（不再「循环注一份 + 额外补一段」）；
+ * - 写引导与看门狗文案按当前启用的轨生成，full 模式必须指向 daily/project，否则那两轨永远是死档。
  */
 import { ENTRY_DELIMITER } from "./store.js";
-import { TRACK_LABELS } from "./tracks.js";
-import { BUDGETS, TOTAL_BUDGET, KEY_TOP_N, KEY_SCAN_N, KEY_EXTRA_CAP, KEY_HOT_WORDS } from "./budgets.js";
+import { TRACK_LABELS, tracksOf } from "./tracks.js";
+import { BUDGETS, TOTAL_BUDGET, KEY_TOP_N, KEY_SCAN_N, KEY_HOT_WORDS } from "./budgets.js";
 
-export const WRITE_GUIDE =
-	"## 每轮收尾\n用 memory_core 工具写一条：重要事实写 `key`，用户偏好写 `user`，长期记忆写 `memory`。";
+/** 写引导：按启用轨给出收尾动作，full 模式强调 daily + project 一次批量写。 */
+export function writeGuideFor(memoryTracks) {
+	const tracks = tracksOf(memoryTracks);
+	const hasProject = tracks.includes("project");
+	const hasDaily = tracks.includes("daily");
+	if (hasProject && hasDaily) {
+		return (
+			"## 每轮收尾\n" +
+			"用 memory_core 工具写一条：一次调用写 daily（今天做了什么）与 project（本项目的进展/决策/坑），" +
+			"重要事实写 `key`，用户偏好写 `user`，长期记忆写 `memory`。"
+		);
+	}
+	return "## 每轮收尾\n用 memory_core 工具写一条：重要事实写 `key`，用户偏好写 `user`，长期记忆写 `memory`。";
+}
 
-export const WRITE_GUARD_NOTICE =
-	"## 提醒\n你连着几个回合没写记忆了。收尾时记得用 memory_core 工具写一条：重要事实写 `key`，" +
-	"用户偏好写 `user`，长期记忆写 `memory`。";
+/** 看门狗提醒：说明盯的是哪几轨、阈值是多少，并指向补写。 */
+export function writeGuardNoticeFor(memoryTracks, threshold) {
+	const tracks = tracksOf(memoryTracks);
+	const duty = tracks.includes("daily") ? "daily / project" : "memory / user / key";
+	return (
+		`## 提醒\n连续 ${threshold} 轮没写 ${duty} 记忆了。收尾时用 memory_core 工具写一条，把这几轮的进展补上。`
+	);
+}
 
-/** 截断后清理开头的孤立分隔符残留。 */
+/** 截断后清理开头的孤立分隔符与残行。 */
 function trimCutHead(text) {
 	let out = text.replace(/^[ \t]*\n+/, "");
 	while (/^§[ \t]*(\n|$)/.test(out)) out = out.replace(/^§[ \t]*\n?/, "").replace(/^[ \t]*\n+/, "");
@@ -36,59 +58,64 @@ function pickKeyEntries(store, agent) {
 	return weighted.map((row) => row.entry);
 }
 
-/** 渲染常驻记忆注入：按 memory > user > key 优先级分配预算。 */
+/** 把条目渲染成 `- 首行` + 续行缩进两格，避免多行条目在列表里断掉层级。 */
+function asBullet(entry) {
+	const lines = String(entry).split("\n");
+	return "- " + lines[0] + lines.slice(1).map((l) => "\n  " + l).join("");
+}
+
+/**
+ * 渲染常驻记忆注入：按 memory > user > key 顺序分配预算，每轨一个块。
+ * 只注入 memory/user/key 三轨；project/daily 是「按需读取」的轨，不进上下文。
+ */
 export function renderResident(store, agent, tracks) {
 	const order = tracks ?? ["memory", "user", "key"];
 	const parts = [];
 	let used = 0;
 	for (const track of order) {
 		if (used >= TOTAL_BUDGET) break;
-		const budget = Math.min(BUDGETS[track], TOTAL_BUDGET - used);
-		if (budget <= 0) break;
-		const entries = store.entriesOf(track, agent);
+		const budget = Math.min(BUDGETS[track] ?? 0, TOTAL_BUDGET - used);
+		if (!(budget > 0)) continue;
+		const entries = track === "key" ? pickKeyEntries(store, agent) : store.entriesOf(track, agent);
 		if (entries.length === 0) continue;
-		let text = entries.join(ENTRY_DELIMITER);
+		let text = entries.map(asBullet).join("\n");
 		if (text.length > budget) {
 			text = text.slice(text.length - budget);
 			const nl = text.indexOf("\n");
 			if (nl >= 0) text = text.slice(nl + 1);
 			text = trimCutHead(text);
 		}
+		if (text.length === 0) continue;
 		parts.push({ track, text, chars: text.length });
 		used += text.length;
-	}
-	const keyBudget = Math.min(KEY_EXTRA_CAP, TOTAL_BUDGET - used);
-	if (keyBudget > 0) {
-		const keyEntries = pickKeyEntries(store, agent);
-		let keyText = keyEntries.join(ENTRY_DELIMITER);
-		if (keyText.length > keyBudget) {
-			keyText = keyText.slice(keyText.length - keyBudget);
-			const nl = keyText.indexOf("\n");
-			if (nl >= 0) keyText = keyText.slice(nl + 1);
-			keyText = trimCutHead(keyText);
-		}
-		if (keyText.length > 0) {
-			parts.push({ track: "key", text: keyText, chars: keyText.length });
-		}
 	}
 	return parts;
 }
 
-/** 渲染 memory:snapshot 注入文本：常驻记忆 + 恒引导 + 条件看门狗提醒。 */
+/**
+ * 快照净化（对齐 evolve issue #53）：宿主把段正文当模板解析，正文里出现未注册的 `{{name}}`
+ * 会让整段渲染抛错，该会话每一步都起不来且无法用工具自救。记忆正文由模型/用户写入，
+ * 天然可能出现 `{{...}}`，所以出口必须只降级、不展开：`{{session}}` → `{session}`。
+ */
+export function sanitizeSnapshot(content) {
+	return String(content ?? "")
+		.replace(/\{\{\s*([\w.-]+)\s*\}\}/g, "{$1}")
+		.replace(/\{\{/g, "{");
+}
+
+/** 渲染 memory-core:snapshot 注入文本：常驻记忆 + 恒引导 + 条件看门狗提醒。 */
 export function renderSnapshot(store, s, writeGap, context) {
 	const agent = context?.agent;
-	const parts = renderResident(store, agent, s.memoryTracks === "full"
-		? ["memory", "user", "project", "key", "daily"]
-		: ["memory", "user", "key"]);
+	const parts = renderResident(store, agent, ["memory", "user", "key"]);
 	const body = parts.length === 0
 		? ""
-		: `${parts.map((p) => `## ${TRACK_LABELS[p.track]}`).join("\n")}\n\n${parts.map((p) => p.text).join("\n\n")}`;
+		: parts.map((p) => `## ${TRACK_LABELS[p.track]}\n${p.text}`).join("\n\n");
 	const due =
-		s.writeGuard === true &&
+		s.perTurnWriteGuard === true &&
 		writeGap !== null &&
 		agent !== undefined &&
 		agent.session?.header?.origin !== "subagent" &&
 		writeGap.gapOf(agent) >= s.writeGuardThreshold;
-	const notice = due ? WRITE_GUARD_NOTICE : "";
-	return [body, WRITE_GUIDE, notice].filter(Boolean).join("\n\n");
+	const notice = due ? writeGuardNoticeFor(s.memoryTracks, s.writeGuardThreshold) : "";
+	return sanitizeSnapshot([body, writeGuideFor(s.memoryTracks), notice].filter(Boolean).join("\n\n"));
 }

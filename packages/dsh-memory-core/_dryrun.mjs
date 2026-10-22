@@ -22,7 +22,7 @@ import { EventEmitter } from "node:events";
 
 import { DEFAULTS } from "./lib/defaults.js";
 import { MemoryStore, SuggestionQueue, ArchiveStore } from "./lib/store.js";
-import { renderSnapshot, renderResident, WRITE_GUARD_NOTICE } from "./lib/render.js";
+import { renderSnapshot, renderResident, writeGuardNoticeFor } from "./lib/render.js";
 import { TOTAL_BUDGET, BUDGETS } from "./lib/budgets.js";
 import { tracksOf, TRACK_FILES } from "./lib/tracks.js";
 
@@ -69,7 +69,7 @@ export async function resolve(specifier, context, next) {
 }
 `));
 }
-const { apply } = await import("./index.js");
+const { apply, __resetInstance } = await import("./index.js");
 
 // ── 断言框架 ────────────────────────────────────────────────────────────
 let pass = 0;
@@ -229,7 +229,8 @@ try {
   console.log(`  node ${process.version} / schemastery ${depInstalled ? "已安装" : "未安装（已注入 stub）"}`);
   console.log(`  tmp = ${root}`);
 
-  apply(ctx, { memoryDir: dirLite, memoryTracks: "lite" });
+  apply(ctx, { memoryDir: dirLite, memoryTracks: "lite", perTurnWriteGuard: true });
+  __resetInstance(); // 单例按进程去重：清空槽位，下一段 full 实例才能注册
 
   const tool = rec.tools[0];
   const injectFn = rec.injects[0]?.fn;
@@ -242,7 +243,7 @@ try {
 
   // ── R. 原有 11 项回归 ────────────────────────────────────────────────
   section("R. 原有 11 项回归（defaults / tracks / 实例化 / render）");
-  ok("R1  memoryTracks 默认 = lite", DEFAULTS.memoryTracks === "lite", "lite", DEFAULTS.memoryTracks);
+  ok("R1  memoryTracks 默认 = full（五轨）", DEFAULTS.memoryTracks === "full", "full", DEFAULTS.memoryTracks);
   ok("R2  writeGuard 默认 = true", DEFAULTS.writeGuard === true, true, DEFAULTS.writeGuard);
   ok("R3  writeGuardThreshold 默认 = 2", DEFAULTS.writeGuardThreshold === 2, 2, DEFAULTS.writeGuardThreshold);
   ok("R4  snapshotOrder 默认 = 500", DEFAULTS.snapshotOrder === 500, 500, DEFAULTS.snapshotOrder);
@@ -395,6 +396,24 @@ try {
   );
   const snapBig = renderSnapshot(budgetStore, { ...DEFAULTS }, null, { agent: agentA });
   ok("6g 超长内容下注入仍可渲染", typeof snapBig === "string" && snapBig.length > 0, "非空字符串", snapBig.length);
+
+  // 6h/6i 注入面固定三轨：project 与 daily 有内容也不进快照（否则项目日志会全文注入）
+  const PROJ_ONLY = `项目日志不该注入 ${U("proj")}`;
+  const DAILY_ONLY = `今日日志不该注入 ${U("daily")}`;
+  budgetStore.add("project", PROJ_ONLY, agentA);
+  budgetStore.add("daily", DAILY_ONLY, agentA);
+  const snapFull = renderSnapshot(budgetStore, { ...DEFAULTS, memoryTracks: "full" }, null, { agent: agentA });
+  ok("6h full 模式不注入 project 轨", !snapFull.includes(PROJ_ONLY), "不含项目日志条目", snapFull.slice(0, 160));
+  ok("6i full 模式不注入 daily 轨", !snapFull.includes(DAILY_ONLY), "不含今日日志条目", snapFull.slice(0, 160));
+
+  // 6j/6k {{}} 净化：宿主的段渲染器把段正文当模板解析，未注册变量直接抛错，
+  // 整段快照渲染失败 = 该会话每一步都起不来（evolve issue #53）。记忆正文
+  // 由模型/用户写入，天然可能带 {{xxx}}，所以这里必须降级成单层大括号。
+  const BRACE = `x-opencode-session: {{session}} ${U("brace")}`;
+  budgetStore.add("memory", BRACE, agentA);
+  const snapBrace = renderSnapshot(budgetStore, { ...DEFAULTS }, null, { agent: agentA });
+  ok("6j 快照里不含未净化的 {{", !snapBrace.includes("{{"), "无 {{ 序列", snapBrace.includes("{{") ? snapBrace.slice(0, 200) : "ok");
+  ok("6k 净化只降一层保留字面内容", snapBrace.includes("{session}"), "含 {session}", snapBrace.includes("{session}"));
   note(`未发现 2800 预算常量；代码实际为 TOTAL_BUDGET=${TOTAL_BUDGET}（lib/budgets.js:5），按此断言`);
 
   // ── 7. 目录隔离 ──────────────────────────────────────────────────────
@@ -416,9 +435,10 @@ try {
 
   // ── 8. 看门狗 ────────────────────────────────────────────────────────
   section("8. 看门狗（连续未写记忆 → 注入提醒）");
-  const NOTICE = "连着几个回合没写记忆";
+  const NOTICE = "轮没写";
   const onTurnStopping = (rec.handlers.get("agent/turn-stopping") ?? [])[0];
-  // 干净起点：前面的 confirm 测试可能已经写过记忆，先写一条把 wroteThisTurn 消耗掉
+  // 干净起点：本段跑的是 lite 模式（没有 daily/project 轨可写），
+  // 所以按 lite 的语义「任意轨写入即清零」，写一条 memory 把 wroteThisTurn 消耗掉
   await tool.execute({ action: "add", target: "memory", content: `看门狗起点 ${U("wd0")}` }, { agent: agentA });
   ok("8a gap=0 时注入不含提醒", !injectFn().includes(NOTICE), "不含提醒", injectFn().includes(NOTICE));
 
@@ -429,7 +449,7 @@ try {
   ok("8c gap=1 仍不提醒", !injectFn().includes(NOTICE), "不含提醒", injectFn().includes(NOTICE));
 
   onTurnStopping({ agent: agentA }); // gap = 2
-  ok("8d gap=2 触发提醒", injectFn().includes(NOTICE), `含「${WRITE_GUARD_NOTICE.slice(0, 12)}…」`, injectFn().slice(0, 200));
+  ok("8d gap=2 触发提醒", injectFn().includes(NOTICE), `含「${writeGuardNoticeFor("lite", 2).slice(0, 12)}…」`, injectFn().slice(0, 200));
 
   // 回归闸：Cordis 的 ctx.<服务> 在未 inject 时会抛（cannot get property "x" without inject），
   // 症状是路由一律 400 空体、注入段抛错。agent 只能经 ctx.get(name, false) 取。
@@ -437,7 +457,7 @@ try {
   ok("8d2 index.js 不直接访问 ctx.agent", !/ctx\.agent\b/.test(coreSrc), "0 处", (coreSrc.match(/ctx\.agent\b/g) ?? []).length);
 
   await tool.execute({ action: "add", target: "memory", content: `看门狗清零 ${U("wd1")}` }, { agent: agentA });
-  onTurnStopping({ agent: agentA }); // 写过记忆 → 下一回合 gap 清零
+  onTurnStopping({ agent: agentA }); // lite 下写过任意轨 → 下一回合 gap 清零
   ok("8e 写入后下一回合提醒消失（noteWrite 已接线）", !injectFn().includes(NOTICE), "不含提醒", injectFn().slice(0, 200));
 
   onTurnStopping({ agent: agentA }); // gap = 1
@@ -469,6 +489,56 @@ try {
   const notFound = await callApi(routeHandler, { url: "/api/memory-core/nope" });
   ok("9g 未知路径返回 404", notFound.status === 404, 404, notFound.status);
 
+  const filesApi = await callApi(routeHandler, { url: "/api/memory-core/files" });
+  ok("9h GET /files 返回每轨行", filesApi.status === 200 && (filesApi.json?.data?.rows ?? []).length === 3, "200 + 3 行（lite）", { status: filesApi.status, rows: filesApi.json?.data?.rows?.length });
+
+  const filesCwd = await callApi(routeHandler, { url: `/api/memory-core/files?cwd=${encodeURIComponent(cwdA)}` });
+  ok("9i GET /files?cwd 带回 cwd", filesCwd.status === 200 && filesCwd.json?.data?.cwd === cwdA, cwdA, filesCwd.json?.data?.cwd);
+
+  const manageHtml = readSafe(new URL("./manage.html", import.meta.url));
+  ok("9j manage.html 用 /files 且带页签/搜索/纯文本视图", manageHtml.includes("/api/memory-core/files") && manageHtml.includes("view-raw") && manageHtml.includes('id="search"'), "含 files/view-raw/search", { len: manageHtml.length });
+  ok(
+    "9o manage.html 最新在前 + 每页 20 条 + 工作目录可填",
+    manageHtml.includes(".slice().reverse()") && manageHtml.includes("PAGE_SIZE = 20") && manageHtml.includes('id="cwd-input"') && manageHtml.includes("pmc-cwd"),
+    "含 reverse/PAGE_SIZE/cwd-input/pmc-cwd",
+    {
+      reverse: manageHtml.includes(".slice().reverse()"),
+      page: manageHtml.includes("PAGE_SIZE = 20"),
+      cwdInput: manageHtml.includes('id="cwd-input"'),
+      remember: manageHtml.includes("pmc-cwd"),
+    },
+  );
+
+  // 9k/9l 运行期配置：设置页面板改完立即生效并持久化（对齐 evolve 设置页的语义）
+  const cfgBefore = await callApi(routeHandler, { url: "/api/memory-core/config" });
+  ok("9k GET /config 返回当前配置与覆盖层路径", cfgBefore.status === 200 && cfgBefore.json?.data?.livePath?.endsWith("memory-core.config.json"), "livePath 指向覆盖层", cfgBefore.json?.data);
+  const cfgSaved = await callApi(routeHandler, {
+    method: "POST",
+    url: "/api/memory-core/config",
+    body: { patch: { memoryTracks: "full", writeGuardThreshold: 3 } },
+  });
+  const cfgAfter = await callApi(routeHandler, { url: "/api/memory-core/config" });
+  ok(
+    "9l POST /config 立即生效并落盘",
+    cfgSaved.status === 200 &&
+      cfgAfter.status === 200 &&
+      cfgAfter.json?.data?.memoryTracks === "full" &&
+      cfgAfter.json?.data?.writeGuardThreshold === 3 &&
+      existsSync(cfgBefore.json?.data?.livePath),
+    "full + 阈值 3 + 文件存在",
+    cfgAfter.json?.data,
+  );
+
+  // 9m/9n 横幅判据：状态接口要能让前端区分 profile / preset 两种装配方式
+  ok("9m /status 带 layer 字段（默认 presetName=default 判 profile）", status.json?.data?.layer === "profile", "profile", status.json?.data?.layer);
+  const clientSrc = readFileSync(new URL("./client.js", import.meta.url), "utf8");
+  ok(
+    "9n client.js 注册 shell.overlay 横幅且含黄/红两档文案",
+    /shell\.overlay/.test(clientSrc) && /data-pmc-banner/.test(clientSrc) && /layer === "profile"/.test(clientSrc) && /全局生效|全局破坏/.test(clientSrc),
+    "含 shell.overlay + 两档文案",
+    { overlay: /shell\.overlay/.test(clientSrc), banner: /data-pmc-banner/.test(clientSrc) },
+  );
+
   // ── 10. 模式与 enabled ───────────────────────────────────────────────
   section("10. lite / full 模式与 enabled");
   ok("10a lite 模式 tracks = memory/user/key", (status.json?.data?.tracks ?? []).join("/") === "memory/user/key", "memory/user/key", status.json?.data?.tracks);
@@ -481,6 +551,29 @@ try {
   ok("10b full 模式 tracks = memory/user/project/key/daily", (statusFull.json?.data?.tracks ?? []).join("/") === "memory/user/project/key/daily", "memory/user/project/key/daily", statusFull.json?.data?.tracks);
 
   ok("10c full 模式下仍注册 1 工具 + 1 注入", recFull.tools.length === 1 && recFull.injects.length === 1, { tools: 1, injects: 1 }, { tools: recFull.tools.length, injects: recFull.injects.length });
+
+  const storeNoCwd = new MemoryStore(join(root, "full-nocwd"), { memoryTracks: "full" });
+  let noCwdOk = true;
+  try {
+    noCwdOk = storeNoCwd.entriesOf("project", undefined).length === 0 && storeNoCwd.entriesOf("key", undefined).length === 0;
+  } catch {
+    noCwdOk = false;
+  }
+  ok("10d full 模式无 cwd 时读 project/key 降级为空（不抛）", noCwdOk, true, noCwdOk);
+
+  // 10e 单例：同进程第二个实例只登记、不注册（避免 duplicate route 与同名工具把 preset 拖崩）
+  __resetInstance();
+  const { ctx: ctxI1, rec: recI1 } = makeCtx(makeAgent(join(root, "cwd-i1")));
+  const { ctx: ctxI2, rec: recI2 } = makeCtx(makeAgent(join(root, "cwd-i2")));
+  apply(ctxI1, { memoryDir: join(root, "inst-1") });
+  apply(ctxI2, { memoryDir: join(root, "inst-2") });
+  ok(
+    "10e 第二个实例不注册工具/注入/路由",
+    recI1.tools.length === 1 && recI1.injects.length === 1 && recI1.web.length === 1 &&
+      recI2.tools.length === 0 && recI2.injects.length === 0 && recI2.web.length === 0,
+    { first: "tools/injects/web 各 1", second: 0 },
+    { firstTools: recI1.tools.length, secondTools: recI2.tools.length, secondInjects: recI2.injects.length, secondWeb: recI2.web.length },
+  );
 
   note("未发现 enabled / 关闭记忆的配置项：lib/schema.js 的 Config 只有 memoryTracks/presetName/memoryDir/writeGuard/writeGuardThreshold/snapshotOrder；index.js apply() 无条件注册工具与注入。因此「不启用记忆时工具/注入是否注册」无对应分支，无法断言——缺该能力");
 

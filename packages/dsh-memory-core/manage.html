@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>遮蔽会话记忆管理 — dsh-memory-core</title>
+<title>遮蔽会话记忆 — dsh-memory-core</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230ea5e9'/%3E%3Cpath d='M5 4h6v2H5zM5 8h6v2H5zM5 12h4v2H5z' fill='white'/%3E%3C/svg%3E">
 <style>
   :root {
@@ -49,16 +49,12 @@
   header {
     background: var(--card);
     border-bottom: 1px solid var(--border);
-    padding: 14px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 10px;
+    padding: 14px 20px 0;
     position: sticky;
     top: 0;
     z-index: 5;
   }
+  .head-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
   header h1 { font-size: 16px; margin: 0; font-weight: 600; }
   .status-line { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
   .chip {
@@ -66,148 +62,207 @@
     border: 1px solid var(--border);
     border-radius: 999px;
     padding: 2px 10px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
   }
-  .chip.badge { background: var(--accent-weak); color: var(--accent); border-color: transparent; }
   .chip.ok { background: var(--ok-weak); color: var(--ok); border-color: transparent; }
   .chip.off { background: var(--danger-weak); color: var(--danger); border-color: transparent; }
-  main { max-width: 1100px; margin: 20px auto; padding: 0 20px; }
-  .layout { display: grid; grid-template-columns: 200px 1fr; gap: 16px; }
-  @media (max-width: 720px) { .layout { grid-template-columns: 1fr; } }
-  nav.tabs {
+  nav.tabs { display: flex; gap: 2px; flex-wrap: wrap; margin-top: 10px; }
+  nav.tabs button {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  nav.tabs button:hover { color: var(--text); }
+  nav.tabs button.active { color: var(--text); border-bottom-color: var(--text); font-weight: 600; }
+  nav.tabs button .count {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: var(--accent-weak);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 400;
+  }
+  main { max-width: 1180px; margin: 18px auto 40px; padding: 0 20px; }
+  .warn {
+    background: var(--warn-weak);
+    color: var(--warn);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    margin-bottom: 10px;
+  }
+  .cwdline { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+  .cwdline code { font-family: ui-monospace, Consolas, monospace; color: var(--text); }
+  .cwdline #cwd-input { width: 320px; max-width: 55vw; font-size: 13px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--text); margin-right: 6px; }
+  .mini { font-size: 12px; padding: 3px 10px; border: 1px solid var(--border); background: #fff; border-radius: 6px; cursor: pointer; color: var(--text); }
+  .mini:disabled { opacity: 0.45; cursor: default; }
+  .pager { display: flex; gap: 10px; align-items: center; justify-content: center; margin: 14px 0 4px; font-size: 13px; color: var(--muted); }
+  .desc { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .filebar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 8px;
-    align-self: start;
-    position: sticky;
-    top: 76px;
+    padding: 10px 14px;
+    margin-bottom: 10px;
   }
-  nav.tabs button {
-    display: block;
-    width: 100%;
-    text-align: left;
-    background: none;
-    border: none;
-    padding: 9px 12px;
+  .filebar .name { font-weight: 600; font-size: 14px; }
+  .filebar .path {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    color: var(--muted);
+    word-break: break-all;
+  }
+  .filebar .spacer { flex: 1; }
+  .viewbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg button { border: none; background: var(--card); padding: 5px 12px; cursor: pointer; font-size: 13px; color: var(--muted); }
+  .seg button.active { background: var(--accent-weak); color: var(--accent); font-weight: 600; }
+  #search {
+    flex: 1;
+    min-width: 220px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
     border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
+    background: var(--card);
     color: var(--text);
-    margin-bottom: 2px;
+    font-size: 13px;
   }
-  nav.tabs button:hover { background: var(--bg); }
-  nav.tabs button.active { background: var(--accent-weak); color: var(--accent); font-weight: 600; }
-  nav.tabs button .count { float: right; color: var(--muted); font-weight: 400; }
-  section.panel { display: none; }
-  section.panel.active { display: block; }
   .card {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 14px 16px;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
   }
-  .card h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; }
-  .card h3 .hint { font-weight: 400; font-size: 12px; color: var(--muted); margin-left: 6px; }
-  .empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
-  .entry {
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 10px 12px;
-    margin-bottom: 8px;
-    position: relative;
-  }
+  .card h3 { font-size: 14px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card h3 .hint { font-weight: 400; color: var(--muted); font-size: 12px; }
+  .entry { border-top: 1px solid var(--border); padding: 10px 0; }
+  .entry:first-of-type { border-top: none; }
   .entry pre {
-    margin: 0 0 8px;
     white-space: pre-wrap;
     word-break: break-word;
-    font-family: inherit;
-    font-size: 13px;
+    margin: 0 0 8px;
+    font: inherit;
     color: var(--text);
   }
-  .entry .date { font-size: 11px; color: var(--muted); margin-right: 8px; }
-  .entry .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .entry .date { display: inline-block; margin-right: 8px; color: var(--muted); font-size: 12px; }
   .entry textarea {
     width: 100%;
-    min-height: 64px;
+    min-height: 90px;
+    padding: 8px;
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 8px;
-    font: 13px/1.5 inherit;
-    resize: vertical;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    margin-bottom: 8px;
   }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
   button {
-    font: 12px/1.4 inherit;
     border: 1px solid var(--border);
     background: var(--card);
     color: var(--text);
     border-radius: 6px;
     padding: 4px 10px;
+    font-size: 12px;
     cursor: pointer;
   }
   button:hover { border-color: var(--accent); color: var(--accent); }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  button.primary:hover { opacity: .9; color: #fff; }
-  button.danger { color: var(--danger); border-color: #f1c0c6; }
-  button.danger:hover { background: var(--danger-weak); border-color: var(--danger); color: var(--danger); }
-  button.ok { color: var(--ok); border-color: #b9dec8; }
-  button.ok:hover { background: var(--ok-weak); border-color: var(--ok); color: var(--ok); }
-  button:disabled { opacity: .45; cursor: not-allowed; }
-  .add-row { display: flex; gap: 8px; margin-top: 4px; }
+  button.primary:hover { color: #fff; opacity: .9; }
+  button.ok { color: var(--ok); }
+  button.danger { color: var(--danger); }
+  .empty { color: var(--muted); font-size: 13px; padding: 6px 0; }
+  .raw-view {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    margin: 0;
+  }
+  .add-row { display: flex; gap: 8px; }
   .add-row input {
     flex: 1;
+    padding: 8px 10px;
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 8px 10px;
-    font: 13px inherit;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
   }
   .toast {
     position: fixed;
-    bottom: 24px;
     left: 50%;
-    transform: translateX(-50%);
-    background: #23272f;
+    bottom: 28px;
+    transform: translateX(-50%) translateY(20px);
+    background: #1f2430;
     color: #fff;
     padding: 8px 16px;
-    border-radius: 8px;
+    border-radius: 6px;
     font-size: 13px;
     opacity: 0;
-    transition: opacity .25s;
     pointer-events: none;
+    transition: opacity .18s, transform .18s;
     z-index: 20;
-    max-width: 80vw;
   }
-  .toast.show { opacity: 1; }
-  .pending-entry { border-left: 3px solid var(--warn); }
-  .archived-entry { border-left: 3px solid var(--muted); opacity: .88; }
-  .note { font-size: 12px; color: var(--muted); margin-top: 6px; }
-  .full-only { display: none; }
-  body.full .full-only { display: initial; }
+  .toast.show { opacity: .95; transform: translateX(-50%) translateY(0); }
+  .guide h4 { margin: 14px 0 6px; font-size: 13px; }
+  .guide p, .guide li { font-size: 13px; color: var(--text); }
+  .guide ul { margin: 4px 0; padding-left: 20px; }
+  .guide code { font-family: ui-monospace, Consolas, monospace; background: var(--bg); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 </style>
 </head>
 <body>
+
 <header>
-  <h1>遮蔽会话记忆管理</h1>
-  <div class="status-line" id="status-line">
-    <span class="chip" id="chip-enabled">加载中…</span>
-    <span class="chip" id="chip-tracks">—</span>
-    <span class="chip" id="chip-preset">preset: —</span>
-    <span class="chip" id="chip-dir">—</span>
+  <div class="head-row">
+    <h1>遮蔽会话记忆</h1>
+    <div class="status-line">
+      <span class="chip ok" id="chip-mode"></span>
+      <span class="chip" id="chip-tracks"></span>
+      <span class="chip" id="chip-preset"></span>
+      <span class="chip" id="chip-dir"></span>
+    </div>
   </div>
+  <nav class="tabs" id="tabs"></nav>
 </header>
 
 <main>
-  <div class="card" id="disabled-card" style="display:none">
-    <h3>当前是纯遮蔽状态（无记忆）</h3>
-    <p class="empty">本 preset 只遮蔽其他记忆插件，自己没有开记忆。三种状态：纯遮蔽（默认）/ 轻量记忆（三轨）/ 完整记忆（五轨）。</p>
-    <p class="note">切到轻量或完整记忆：在插件设置里打开「记忆功能」（轻量默认 lite 三轨；想要五轨再设 memoryTracks: full），然后刷新本页。复制下面这句给 agent：<br>
-    <code>请把 dsh-memory-core 切到「完整记忆」状态：memoryTracks=full，然后告诉我怎么用记忆管理面板。</code></p>
+  <div id="notice"></div>
+  <div class="desc" id="desc"></div>
+  <div class="filebar" id="filebar" style="display:none">
+    <span class="name" id="file-title"></span>
+    <span class="chip" id="file-mode">结构化</span>
+    <span class="chip" id="file-count"></span>
+    <span class="path" id="file-path"></span>
+    <span class="spacer"></span>
+    <button id="open-file">打开文件</button>
+    <button id="copy-path">复制路径</button>
   </div>
-
-  <div class="layout" id="layout" style="display:none">
-    <nav class="tabs" id="tabs"></nav>
-    <div id="content"></div>
+  <div class="viewbar" id="viewbar" style="display:none">
+    <span class="seg">
+      <button id="view-pretty" class="active">美观视图</button>
+      <button id="view-raw">纯文本视图</button>
+    </span>
+    <input id="search" placeholder="搜索内容、时间或标签…">
   </div>
+  <div id="content"></div>
 </main>
 
 <div class="toast" id="toast"></div>
@@ -215,258 +270,491 @@
 <script>
 (function () {
   "use strict";
-  const $ = (sel) => document.querySelector(sel);
-  let state = { status: null, tracks: [], cache: {} };
+  var $ = function (sel) { return document.querySelector(sel); };
+  var params = new URLSearchParams(location.search);
+  var PAGE_SIZE = 20;
+  var state = {
+    status: null,
+    rows: [],
+    tab: null,
+    view: "pretty",
+    query: "",
+    page: 1,
+    cwd: params.get("cwd") || localStorage.getItem("pmc-cwd") || "",
+    cache: {},
+  };
+
+  // 页签顺序与 evolve 记忆页一致；AGENTS 不属于本包（全局规则由 dsh-agent-instructions 管），不设页签。
+  var TABS = [
+    { key: "guide", title: "指南" },
+    { key: "pending", title: "待确认记忆建议", desc: "写入后需人工确认的条目（如 key 轨的 writeGuard）。确认即写入对应轨，拒绝即丢弃。" },
+    { key: "project", title: "项目日志", track: "project", desc: "每回合收尾自动记录本回合进展；不注入上下文，模型按需读取。" },
+    { key: "key", title: "项目关键记忆 KEY.md", track: "key", desc: "下次会话不知道就会做错的事实（判据、坑、口径、约定）；注入摘要，写入需确认。" },
+    { key: "archive:key", title: "项目关键记忆归档 KEY-archive.md", track: "key", archived: true, desc: "已归档的项目关键记忆，不注入任何会话，可移回主轨。" },
+    { key: "daily", title: "今日日志", track: "daily", desc: "按天记录当天进展；不注入上下文，模型按需读取。" },
+    { key: "user", title: "用户档案 USER.md", track: "user", desc: "关于用户的稳定事实与偏好；每轮注入上下文。" },
+    { key: "memory", title: "长期记忆 MEMORY.md", track: "memory", desc: "跨项目通用的事实与约定；每轮注入上下文。" },
+    { key: "archive:user", title: "归档用户 USER-archive.md", track: "user", archived: true, desc: "已归档的用户档案，不注入，可移回主轨。" },
+    { key: "archive:memory", title: "归档记忆 MEMORY-archive.md", track: "memory", archived: true, desc: "已归档的长期记忆，不注入，可移回主轨。" },
+  ];
+
+  function tabOf(key) {
+    for (var i = 0; i < TABS.length; i++) if (TABS[i].key === key) return TABS[i];
+    return null;
+  }
 
   function toast(msg) {
-    const el = $("#toast");
+    var el = $("#toast");
     el.textContent = msg;
     el.classList.add("show");
     clearTimeout(el._t);
-    el._t = setTimeout(() => el.classList.remove("show"), 2600);
+    el._t = setTimeout(function () { el.classList.remove("show"); }, 2600);
   }
 
   async function api(url, opts) {
-    const res = await fetch(url, opts);
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.ok === false) {
-      throw new Error(data.message || ("请求失败 HTTP " + res.status));
-    }
+    var res = await fetch(url, opts);
+    var data = await res.json().catch(function () { return {}; });
+    if (!res.ok || data.ok === false) throw new Error(data.why || data.message || ("请求失败 HTTP " + res.status));
     return data;
   }
 
   function esc(s) {
-    return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
 
-  async function loadStatus() {
-    const data = await api("/api/memory-core/status");
-    state.status = data.data;
-    state.tracks = data.data.tracks || [];
-    renderStatus();
-    if (data.data.memoryEnabled !== true) {
-      $("#disabled-card").style.display = "";
-      $("#layout").style.display = "none";
-      return;
-    }
-    $("#disabled-card").style.display = "none";
-    $("#layout").style.display = "";
-    document.body.classList.toggle("full", data.data.memoryTracks === "full");
+  function fmtDate(entry) {
+    var m = /^\[(\d{4}-\d{2}-\d{2})(?: (\d{2}:\d{2}))?\]/.exec(entry);
+    return m ? m[1] + (m[2] ? " " + m[2] : "") : "";
+  }
+
+  function rowsUrl() {
+    return "/api/memory-core/files" + (state.cwd ? "?cwd=" + encodeURIComponent(state.cwd) : "");
+  }
+
+  function rowOf(track) {
+    for (var i = 0; i < state.rows.length; i++) if (state.rows[i].track === track) return state.rows[i];
+    return null;
+  }
+
+  async function boot() {
+    var files = await api(rowsUrl());
+    state.status = files.data;
+    state.rows = files.data.rows || [];
+    renderHeader();
     renderTabs();
-    await loadTrack(state.tracks[0]);
+    var first = tabOf("project");
+    var projectRow = rowOf("project");
+    if (!projectRow || !projectRow.available) first = tabOf("memory");
+    await switchTab(first.key);
   }
 
-  function renderStatus() {
-    const s = state.status;
-    const chipEnabled = $("#chip-enabled");
-    if (s.memoryEnabled === true) {
-      chipEnabled.textContent = s.memoryTracks === "full" ? "完整记忆（五轨）" : "轻量记忆（三轨）";
-      chipEnabled.className = "chip ok";
-    } else {
-      chipEnabled.textContent = "纯遮蔽状态（无记忆）";
-      chipEnabled.className = "chip off";
-    }
-    $("#chip-tracks").textContent = "tracks: " + (s.tracks || []).join(" / ");
+  function renderHeader() {
+    var s = state.status;
+    var mode = $("#chip-mode");
+    mode.textContent = s.memoryTracks === "full" ? "完整记忆（五轨）" : "轻量记忆（三轨）";
+    mode.className = "chip ok";
+    $("#chip-tracks").textContent = "tracks: " + (s.rows || []).map(function (r) { return r.track; }).join(" / ");
     $("#chip-preset").textContent = "preset: " + s.presetName;
     $("#chip-dir").textContent = s.memoryDir || "";
+    var html = '<div class="warn">⚠️ 以下文件为 § 分隔的结构化记忆，用系统工具打开后请谨慎编辑，随意修改可能破坏格式、导致记忆读取错乱。</div>';
+    if (state.cwd) {
+      html += '<div class="cwdline">当前会话工作目录：<code>' + esc(state.cwd) + '</code> <button class="mini" id="cwd-edit">修改</button></div>';
+    } else {
+      html += '<div class="cwdline">当前会话工作目录：<input id="cwd-input" placeholder="D:\\项目路径" value="' + esc(state.cwd) + '"> <button class="mini primary" id="cwd-set">使用</button> <span class="hint">项目日志与项目关键记忆需要它，填一次会记住</span></div>';
+    }
+    $("#notice").innerHTML = html;
+    var setBtn = $("#cwd-set");
+    if (setBtn) {
+      setBtn.addEventListener("click", function () {
+        var v = ($("#cwd-input").value || "").trim();
+        if (!v) { toast("目录为空"); return; }
+        state.cwd = v;
+        try { localStorage.setItem("pmc-cwd", v); } catch (e) {}
+        state.cache = {};
+        state.page = 1;
+        load();
+      });
+    }
+    var editBtn = $("#cwd-edit");
+    if (editBtn) {
+      editBtn.addEventListener("click", function () {
+        state.cwd = "";
+        try { localStorage.removeItem("pmc-cwd"); } catch (e) {}
+        state.cache = {};
+        state.page = 1;
+        load();
+      });
+    }
   }
 
   function renderTabs() {
-    const tabs = $("#tabs");
+    var tabs = $("#tabs");
     tabs.innerHTML = "";
-    const labels = {
-      memory: "长期记忆", user: "用户档案", key: "关键事实",
-      project: "项目记忆", daily: "每日日志",
-    };
-    for (const track of state.tracks) {
-      const btn = document.createElement("button");
-      btn.textContent = labels[track] || track;
-      btn.dataset.track = track;
-      btn.addEventListener("click", () => switchTrack(track));
+    for (var i = 0; i < TABS.length; i++) {
+      var t = TABS[i];
+      var n = 0;
+      if (t.key === "pending") {
+        for (var j = 0; j < state.rows.length; j++) n += state.rows[j].pending || 0;
+      } else if (t.archived) {
+        var ar = rowOf(t.track);
+        n = ar ? ar.archived : 0;
+      } else if (t.track) {
+        var row = rowOf(t.track);
+        n = row ? row.count : 0;
+      }
+      var btn = document.createElement("button");
+      btn.dataset.tab = t.key;
+      btn.innerHTML = t.key === "guide" ? esc(t.title) : esc(t.title) + '<span class="count">' + n + "</span>";
+      if (t.track) {
+        var rr = rowOf(t.track);
+        if (rr && !rr.available) btn.title = "需要会话工作目录";
+      }
+      btn.addEventListener("click", (function (key) {
+        return function () { switchTab(key); };
+      })(t.key));
       tabs.appendChild(btn);
     }
   }
 
-  function setActiveTab(track) {
-    for (const btn of document.querySelectorAll("#tabs button")) {
-      btn.classList.toggle("active", btn.dataset.track === track);
+  function setActiveTab(key) {
+    var btns = document.querySelectorAll("#tabs button");
+    for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("active", btns[i].dataset.tab === key);
+  }
+
+  async function switchTab(key) {
+    state.tab = key;
+    state.query = "";
+    state.page = 1;
+    $("#search").value = "";
+    state.view = "pretty";
+    $("#view-pretty").classList.add("active");
+    $("#view-raw").classList.remove("active");
+    setActiveTab(key);
+    var t = tabOf(key);
+    $("#desc").textContent = t && t.desc ? t.desc : "";
+
+    if (key === "guide") {
+      $("#filebar").style.display = "none";
+      $("#viewbar").style.display = "none";
+      renderGuide();
+      return;
+    }
+
+    if (key === "pending") {
+      $("#filebar").style.display = "none";
+      $("#viewbar").style.display = "none";
+      await renderPending();
+      return;
+    }
+
+    var base = t.archived ? t.track : t.track;
+    var q = new URLSearchParams({ track: base });
+    if (state.cwd) q.set("cwd", state.cwd);
+    var data = await api("/api/memory-core/entries?" + q.toString());
+    state.cache[key] = { rows: data.data, tab: t };
+    $("#filebar").style.display = "";
+    $("#viewbar").style.display = "";
+    $("#file-title").textContent = t.title;
+    $("#file-count").textContent = (t.archived ? (data.data.archived || []).length : (data.data.entries || []).length) + " 条";
+    var row = rowOf(base);
+    $("#file-path").textContent = row && row.path ? row.path : "（不可用：需要会话工作目录）";
+    $("#open-file").style.display = row && row.path ? "" : "none";
+    renderTrack();
+  }
+
+  function renderGuide() {
+    $("#content").innerHTML = ''
+      + '<div class="card guide">'
+      + '<h3>这是什么</h3>'
+      + '<p>这是 <code>dsh-memory-core</code> 的管理页：给被 <code>dsh-memory-shield</code> 遮蔽的会话提供一套隔离记忆，与全局 <code>dsh-memory-evolve</code> 的存储互不影响。</p>'
+      + '<h4>五条记忆轨</h4>'
+      + '<ul>'
+      + '<li><code>memory</code> 长期记忆 MEMORY.md：跨项目通用事实，每轮注入。</li>'
+      + '<li><code>user</code> 用户档案 USER.md：关于用户的稳定偏好，每轮注入。</li>'
+      + '<li><code>project</code> 项目日志：按项目（工作目录哈希）记录每回合进展，不注入、按需读取。</li>'
+      + '<li><code>key</code> 项目关键记忆 KEY.md：下次会话不知道就会做错的事实，注入摘要，写入需确认。</li>'
+      + '<li><code>daily</code> 今日日志：按天记录，不注入。</li>'
+      + '</ul>'
+      + '<p>lite 模式只开 memory / user / key 三条；full 模式五条全开（默认）。轨数决定「可写与可见」，不改变注入面。</p>'
+      + '<h4>机制：怎么注入</h4>'
+      + '<ul>'
+      + '<li>每轮把三条注入轨拼成一段快照（section <code>memory-core:snapshot</code>），总预算 <b>2,000 字符</b>；超出时保留最近的条目，从旧条目尾部截断。</li>'
+      + '<li>预算分配：<code>memory</code> 1,000 → <code>user</code> 600 → <code>key</code> 400，按此顺序累加，用完即停。</li>'
+      + '<li><code>key</code> 轨另有加权：先取最近 8 条，按「不要 / 必须 / 注意 / 重要 / 偏好 / 禁止 / 始终 / 永远」的命中数排序取前 5 条，再补最多 600 字符。</li>'
+      + '<li><code>project</code> 与 <code>daily</code> 不进快照，模型要用时通过 <code>memory_core</code> 的 <code>list</code> 现读。</li>'
+      + '<li>写入提醒：连续 2 个回合没写记忆，快照末尾追加一句提醒；子代理会话不提醒。</li>'
+      + '</ul>'
+      + '<h4>机制：怎么写</h4>'
+      + '<ul>'
+      + '<li>工具是 <code>memory_core</code>，动作 <code>add / list / replace / remove / archive / promote / removeArchive / confirm / reject</code>，target 为五轨之一。</li>'
+      + '<li><code>key</code> 轨的 <code>add</code> 先进「待确认记忆建议」，在待确认页签点「允许并写入」才落盘。</li>'
+      + '<li>本页可以直接新增、编辑、归档、删除，改动立即写文件；归档可逆，能从归档页签移回主轨。</li>'
+      + '</ul>'
+      + '<h4>机制：存在哪</h4>'
+      + '<ul>'
+      + '<li>数据目录与 <code>DSH_HOME</code> 同级：<code>&lt;DSH_HOME 的上级&gt;/.dsh-plugin-data/&lt;presetName&gt;/memory</code>。</li>'
+      + '<li><code>memory.md</code>、<code>user.md</code>、<code>daily/&lt;日期&gt;.md</code>；项目相关的落 <code>projects/&lt;工作目录哈希&gt;/memory.md</code> 与 <code>key.md</code>。</li>'
+      + '<li>条目以 <code>§</code> 分隔，归档写在同目录的 archive 文件里。</li>'
+      + '<li>整套存储与 <code>dsh-memory-evolve</code> 完全隔离，互相看不到对方的条目。</li>'
+      + '</ul>'
+      + '<h4>为什么没有「全局规则 AGENTS.md」页签</h4>'
+      + '<p>AGENTS.md 归 <code>dsh-agent-instructions</code> 管，不在本包的记忆目录里。</p>'
+      + '<h4>致谢</h4>'
+      + '<p>存储层（<code>lib/store.js</code>）与记忆页的形制参考 <a href="https://github.com/csyangwen/dsh-memory-evolve" target="_blank" rel="noreferrer">dsh-memory-evolve</a>（作者 csyangwen，MIT），按「隔离会话」的需要做了适配。</p>'
+      + '</div>';
+  }
+
+  async function renderPending() {
+    var html = [];
+    var total = 0;
+    for (var i = 0; i < state.rows.length; i++) {
+      var row = state.rows[i];
+      if (!row.pending) continue;
+      var q = new URLSearchParams({ track: row.track });
+      if (state.cwd) q.set("cwd", state.cwd);
+      var data;
+      try { data = await api("/api/memory-core/entries?" + q.toString()); } catch (e) { continue; }
+      var list = data.data.pending || [];
+      if (!list.length) continue;
+      total += list.length;
+      html.push('<div class="card"><h3>' + esc(row.title) + ' <span class="hint">' + list.length + ' 条</span></h3>');
+      for (var j = 0; j < list.length; j++) {
+        var p = list[j];
+        var text = p.content || p.entry || "";
+        html.push('<div class="entry pending-entry"><pre>' + esc(text) + '</pre><div class="actions">');
+        html.push('<button data-op="confirm" data-track="' + esc(row.track) + '" data-entry="' + esc(text) + '" class="ok">允许并写入</button>');
+        html.push('<button data-op="reject" data-track="' + esc(row.track) + '" data-entry="' + esc(text) + '" class="danger">拒绝</button>');
+        html.push('</div></div>');
+      }
+      html.push('</div>');
+    }
+    if (!total) html.push('<div class="card"><div class="empty">暂无待确认记忆。</div></div>');
+    $("#content").innerHTML = html.join("");
+    bindActions();
+  }
+
+  function filtered(list) {
+    if (!state.query) return list;
+    var q = state.query.toLowerCase();
+    return list.filter(function (e) { return String(e).toLowerCase().indexOf(q) >= 0; });
+  }
+
+  function pagerHtml(pages, total) {
+    if (pages <= 1) return "";
+    return (
+      '<div class="pager"><button class="mini" data-page="prev"' + (state.page <= 1 ? " disabled" : "") + ">上一页</button>" +
+      "<span>" + state.page + " / " + pages + " · 共 " + total + " 条</span>" +
+      '<button class="mini" data-page="next"' + (state.page >= pages ? " disabled" : "") + ">下一页</button></div>"
+    );
+  }
+
+  function bindPager() {
+    var btns = document.querySelectorAll("[data-page]");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].addEventListener("click", function (ev) {
+        var dir = ev.currentTarget.getAttribute("data-page");
+        state.page += dir === "next" ? 1 : -1;
+        if (state.page < 1) state.page = 1;
+        renderTrack();
+      });
     }
   }
 
-  async function switchTrack(track) {
-    setActiveTab(track);
-    await loadTrack(track);
-  }
+  function renderTrack() {
+    var t = tabOf(state.tab);
+    var d = state.cache[state.tab];
+    var content = $("#content");
+    if (!d || !t) { content.innerHTML = ""; return; }
+    var items = (t.archived ? d.rows.archived : d.rows.entries) || [];
+    // 最新在前：文件里是追加写，直接渲染会把最旧的放最上面
+    var list = filtered(items).slice().reverse();
+    var total = list.length;
+    var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    if (state.page > pages) state.page = pages;
+    var start = (state.page - 1) * PAGE_SIZE;
+    var pageList = list.slice(start, start + PAGE_SIZE);
 
-  async function loadTrack(track) {
-    const data = await api("/api/memory-core/entries?track=" + encodeURIComponent(track));
-    state.cache[track] = data.data;
-    renderTrack(track);
-  }
-
-  function renderTrack(track) {
-    const d = state.cache[track];
-    const content = $("#content");
-    const labels = {
-      memory: "长期记忆", user: "用户档案", key: "关键事实",
-      project: "项目记忆", daily: "每日日志",
-    };
-    const html = [];
-    html.push('<section class="panel active">');
-
-    // 正式条目
-    html.push('<div class="card"><h3>' + esc(labels[track] || track) + ' · 正式条目 <span class="hint">' + (d.entries || []).length + ' 条</span></h3>');
-    if (!d.entries || d.entries.length === 0) {
-      html.push('<div class="empty">暂无记忆条目。</div>');
-    } else {
-      for (let i = 0; i < d.entries.length; i++) {
-        const entry = d.entries[i];
-        const dateMatch = /^\[(\d{4}-\d{2}-\d{2})/.exec(entry);
-        const date = dateMatch ? dateMatch[1] : "";
-        html.push('<div class="entry" data-index="' + i + '">');
-        html.push('<pre>' + (date ? '<span class="date">' + esc(date) + '</span>' : "") + esc(entry) + '</pre>');
-        html.push('<div class="actions">');
-        html.push('<button data-op="edit" data-track="' + esc(track) + '" data-index="' + i + '">编辑</button>');
-        html.push('<button data-op="archive" data-track="' + esc(track) + '" data-index="' + i + '">归档</button>');
-        html.push('<button data-op="delete" data-track="' + esc(track) + '" data-index="' + i + '" class="danger">删除</button>');
-        html.push('</div></div>');
-      }
+    if (state.view === "raw") {
+      content.innerHTML = '<pre class="raw-view">' + esc(pageList.join("\n§\n")) + "</pre>" + pagerHtml(pages, total);
+      bindPager();
+      return;
     }
-    html.push('</div>');
 
-    // 待确认
-    html.push('<div class="card"><h3>待确认 <span class="hint">' + (d.pending || []).length + ' 条 · 写入后需人工确认</span></h3>');
-    if (!d.pending || d.pending.length === 0) {
-      html.push('<div class="empty">暂无待确认记忆。</div>');
-    } else {
-      for (let i = 0; i < d.pending.length; i++) {
-        const sug = d.pending[i];
-        html.push('<div class="entry pending-entry">');
-        html.push('<pre>' + esc(sug.entry ?? sug.content ?? "") + '</pre>');
-        html.push('<div class="actions">');
-        html.push('<button data-op="confirm" data-track="' + esc(track) + '" data-index="' + i + '" class="ok">允许并写入</button>');
-        html.push('<button data-op="reject" data-track="' + esc(track) + '" data-index="' + i + '" class="danger">拒绝</button>');
-        html.push('</div></div>');
+    var html = [];
+
+    if (t.archived) {
+      html.push('<div class="card"><h3>归档 <span class="hint">' + total + ' 条 · 不注入任何会话，可移回主轨</span></h3>');
+      if (!pageList.length) html.push('<div class="empty">' + (state.query ? "没有匹配的归档条目。" : "暂无归档条目。") + "</div>");
+      for (var i = 0; i < pageList.length; i++) {
+        var entry = pageList[i];
+        html.push('<div class="entry archived-entry"><pre>' + esc(entry) + '</pre><div class="actions">');
+        html.push('<button data-op="promote" data-track="' + esc(t.track) + '" data-entry="' + esc(entry) + '" class="ok">移回主轨</button>');
+        html.push('<button data-op="removeArchive" data-track="' + esc(t.track) + '" data-entry="' + esc(entry) + '" class="danger">删除</button>');
+        html.push("</div></div>");
       }
+      html.push(pagerHtml(pages, total));
+      html.push("</div>");
+      content.innerHTML = html.join("");
+      bindActions();
+      bindPager();
+      return;
     }
-    html.push('</div>');
 
-    // 归档
-    html.push('<div class="card"><h3>归档 <span class="hint">' + (d.archived || []).length + ' 条 · 不注入任何会话</span></h3>');
-    if (!d.archived || d.archived.length === 0) {
-      html.push('<div class="empty">暂无归档条目。</div>');
-    } else {
-      for (let i = 0; i < d.archived.length; i++) {
-        const entry = d.archived[i];
-        html.push('<div class="entry archived-entry">');
-        html.push('<pre>' + esc(entry) + '</pre>');
-        html.push('<div class="actions">');
-        html.push('<button data-op="promote" data-track="' + esc(track) + '" data-index="' + i + '" class="ok">移回主轨</button>');
-        html.push('<button data-op="removeArchive" data-track="' + esc(track) + '" data-index="' + i + '" class="danger">删除</button>');
-        html.push('</div></div>');
-      }
+    html.push('<div class="card"><h3>' + esc(t.title.replace(/\s+[A-Z-]+\.md$/, "")) + ' · 正式条目 <span class="hint">' + total + ' 条</span></h3>');
+    if (!pageList.length) html.push('<div class="empty">' + (state.query ? "没有匹配的条目。" : "暂无记忆条目。") + "</div>");
+    for (var k = 0; k < pageList.length; k++) {
+      var text = pageList[k];
+      var date = fmtDate(text);
+      html.push('<div class="entry"><pre>' + (date ? '<span class="date">' + esc(date) + "</span>" : "") + esc(text) + "</pre>");
+      html.push('<div class="actions">');
+      html.push('<button data-op="edit" data-track="' + esc(t.track) + '" data-entry="' + esc(text) + '">编辑</button>');
+      html.push('<button data-op="archive" data-track="' + esc(t.track) + '" data-entry="' + esc(text) + '">归档</button>');
+      html.push('<button data-op="delete" data-track="' + esc(t.track) + '" data-entry="' + esc(text) + '" class="danger">删除</button>');
+      html.push("</div></div>");
     }
-    html.push('</div>');
+    html.push(pagerHtml(pages, total));
+    html.push("</div>");
 
-    // 新增
-    html.push('<div class="card"><h3>新增条目</h3>');
-    html.push('<div class="add-row">');
-    html.push('<input id="new-entry-input" placeholder="写一条 ' + esc(labels[track] || track) + ' 记忆…">');
-    html.push('<button id="new-entry-btn" class="primary">写入</button>');
-    html.push('</div></div>');
+    html.push('<div class="card"><h3>新增条目 <span class="hint">写入 ' + esc(t.title) + "</span></h3>");
+    html.push('<div class="add-row"><input id="new-entry-input" placeholder="写一条 ' + esc(t.title) + '…"><button id="new-entry-btn" class="primary">写入</button></div></div>');
 
-    html.push('</section>');
     content.innerHTML = html.join("");
+    $("#new-entry-btn").addEventListener("click", addEntry);
+    $("#new-entry-input").addEventListener("keydown", function (ev) { if (ev.key === "Enter") addEntry(); });
+    bindActions();
+    bindPager();
+  }
 
-    // 新增条目
-    $("#new-entry-btn").addEventListener("click", async () => {
-      const input = $("#new-entry-input");
-      const contentText = input.value.trim();
-      if (!contentText) { toast("内容为空"); return; }
+  function currentTrack() {
+    var t = tabOf(state.tab);
+    return t && t.track ? t.track : "memory";
+  }
+
+  async function addEntry() {
+    var input = $("#new-entry-input");
+    var text = input.value.trim();
+    if (!text) { toast("内容为空"); return; }
+    var track = currentTrack();
+    try {
+      await api("/api/memory-core/entry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "add", track: track, content: text, cwd: state.cwd || undefined }),
+      });
+      toast("已写入 " + track);
+      await refreshRows();
+      await switchTab(state.tab);
+    } catch (e) { toast(e.message); }
+  }
+
+  async function refreshRows() {
+    var files = await api(rowsUrl());
+    state.status = files.data;
+    state.rows = files.data.rows || [];
+    renderTabs();
+  }
+
+  function bindActions() {
+    var btns = document.querySelectorAll("#content button[data-op]");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].addEventListener("click", onClickAction);
+    }
+  }
+
+  async function onClickAction(ev) {
+    var btn = ev.currentTarget;
+    var op = btn.dataset.op;
+    var track = btn.dataset.track;
+    var entry = btn.dataset.entry;
+
+    if (op === "edit") {
+      var div = btn.closest(".entry");
+      var pre = div.querySelector("pre");
+      var ta = document.createElement("textarea");
+      ta.value = entry;
+      pre.replaceWith(ta);
+      btn.textContent = "保存";
+      btn.dataset.op = "saveEdit";
+      btn.classList.add("primary");
+      var cancel = document.createElement("button");
+      cancel.textContent = "取消";
+      btn.after(cancel);
+      cancel.addEventListener("click", function () { switchTab(state.tab); });
+      return;
+    }
+
+    if (op === "saveEdit") {
+      var ta2 = btn.closest(".entry").querySelector("textarea");
       try {
         await api("/api/memory-core/entry", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "add", track, content: contentText }),
+          body: JSON.stringify({ action: "replace", track: track, entry: entry, content: ta2.value, cwd: state.cwd || undefined }),
         });
-        toast("已写入 " + (labels[track] || track));
-        await loadTrack(track);
+        toast("已更新");
+        await switchTab(state.tab);
       } catch (e) { toast(e.message); }
-    });
-    $("#new-entry-input").addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter") $("#new-entry-btn").click();
-    });
+      return;
+    }
 
-    // 条目操作
-    content.querySelectorAll("button[data-op]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const op = btn.dataset.op;
-        const index = Number(btn.dataset.index);
-        const body = { action: op, track };
-        if (["edit"].includes(op)) {
-          const entryDiv = btn.closest(".entry");
-          const pre = entryDiv.querySelector("pre");
-          const original = state.cache[track].entries[index];
-          if (!original) return;
-          const textarea = document.createElement("textarea");
-          textarea.value = original;
-          pre.replaceWith(textarea);
-          btn.textContent = "保存";
-          btn.dataset.op = "saveEdit";
-          btn.dataset.index = index;
-          btn.classList.add("primary");
-          const cancelBtn = document.createElement("button");
-          cancelBtn.textContent = "取消";
-          cancelBtn.dataset.op = "cancelEdit";
-          cancelBtn.dataset.index = index;
-          btn.after(cancelBtn);
-          return;
-        }
-        if (op === "saveEdit") {
-          const entryDiv = btn.closest(".entry");
-          const textarea = entryDiv.querySelector("textarea");
-          body.entry = state.cache[track].entries[index];
-          body.content = textarea.value;
-          try {
-            await api("/api/memory-core/entry", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(body),
-            });
-            toast("已更新");
-            await loadTrack(track);
-          } catch (e) { toast(e.message); }
-          return;
-        }
-        if (op === "cancelEdit") {
-          await loadTrack(track);
-          return;
-        }
-        const source =
-          op === "delete" || op === "archive" ? state.cache[track].entries[index]
-          : op === "confirm" || op === "reject" ? state.cache[track].pending[index].content
-          : op === "promote" || op === "removeArchive" ? state.cache[track].archived[index]
-          : undefined;
-        if (source === undefined) return;
-        if (op === "delete" && !confirm("确认删除这条记忆？此操作不可撤销。")) return;
-        body.entry = source;
-        try {
-          await api("/api/memory-core/entry", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-          const msg = { archive: "已归档", delete: "已删除", confirm: "已允许并写入", reject: "已拒绝", promote: "已移回主轨", removeArchive: "已从归档删除" };
-          toast(msg[op] || "完成");
-          await loadTrack(track);
-        } catch (e) { toast(e.message); }
+    if (op === "delete" && !confirm("确认删除这条记忆？此操作不可撤销。")) return;
+    try {
+      await api("/api/memory-core/entry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: op, track: track, entry: entry, cwd: state.cwd || undefined }),
       });
-    });
+      var msg = { archive: "已归档", delete: "已删除", confirm: "已允许并写入", reject: "已拒绝", promote: "已移回主轨", removeArchive: "已从归档删除" };
+      toast(msg[op] || "完成");
+      await refreshRows();
+      await switchTab(state.tab);
+    } catch (e) { toast(e.message); }
   }
 
-  loadStatus().catch((e) => {
-    toast("初始化失败：" + e.message);
-    $("#status-line").innerHTML = '<span class="chip off">无法连接插件后端（/api/memory-core）</span>';
+  $("#view-pretty").addEventListener("click", function () {
+    state.view = "pretty";
+    $("#view-pretty").classList.add("active");
+    $("#view-raw").classList.remove("active");
+    renderTrack();
+  });
+  $("#view-raw").addEventListener("click", function () {
+    state.view = "raw";
+    $("#view-raw").classList.add("active");
+    $("#view-pretty").classList.remove("active");
+    renderTrack();
+  });
+  $("#search").addEventListener("input", function (ev) {
+    state.query = ev.target.value.trim();
+    state.page = 1;
+    renderTrack();
+  });
+  $("#copy-path").addEventListener("click", async function () {
+    var p = $("#file-path").textContent;
+    try {
+      await navigator.clipboard.writeText(p);
+      toast("路径已复制");
+    } catch (e) {
+      toast(p);
+    }
+  });
+  $("#open-file").addEventListener("click", async function () {
+    var p = $("#file-path").textContent;
+    if (!p) return;
+    try {
+      await api("/api/memory-core/reveal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: p }),
+      });
+    } catch (e) { toast(e.message); }
+  });
+
+  boot().catch(function (e) {
+    $("#notice").innerHTML = '<div class="warn">无法连接插件后端（/api/memory-core）：' + esc(e.message) + "</div>";
   });
 })();
 </script>

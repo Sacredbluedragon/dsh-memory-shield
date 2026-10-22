@@ -525,7 +525,11 @@ export class MemoryStore {
 
   /** Read the raw file; a missing file reads as an empty store. */
   readRaw(target, agent) {
-    const path = this.pathOf(target, agent)
+    // project / full 模式的 key 需要会话工作目录：没有 cwd 时读路径降级为空，
+    // 不抛错——注入段和面板都会读这些轨，抛一次就把整段注入带崩。写入仍走 pathOf（会明确报错）。
+    const loc = this.locate(target, agent)
+    if (!loc) return { text: '', size: 0 }
+    const path = join(loc.dir, loc.file)
     try {
       return { text: readFileSync(path, 'utf8'), size: statSync(path).size }
     } catch (error) {

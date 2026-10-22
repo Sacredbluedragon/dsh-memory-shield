@@ -66,6 +66,8 @@ window.__ModuleLoader__.load({
 [data-ms-badge="on"]{background:#3c9a5f;color:#fff;}
 [data-ms-overlay]{position:fixed;top:0;left:0;right:0;z-index:var(--ms-overlay-z,9999);display:flex;align-items:center;gap:12px;padding:8px 16px;background:var(--dsw-alias-bg-overlay,#fff);color:var(--dsw-alias-label-primary,#111);font-size:13px;border-bottom:1px solid var(--dsw-alias-border-l1,#e5e7eb);box-shadow:0 2px 8px rgba(0,0,0,.12);}
 [data-ms-overlay-text]{flex:1;line-height:1.5;}
+[data-ms-overlay="danger"]{background:#fee2e2;color:#991b1b;border-bottom-color:#fca5a5;}
+[data-ms-overlay="warn"]{background:#fef3c7;color:#7c4a03;border-bottom-color:#fcd34d;}
 [data-ms-explain]{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border-radius:6px;background:var(--dsw-alias-bg-l2,rgba(128,128,128,.08));}
 [data-ms-explain-line]{font-size:12px;line-height:1.65;}
 [data-ms-copy]{display:flex;flex-direction:column;gap:4px;}
@@ -216,6 +218,27 @@ function CopyButton(props) {
               : '还没挂到任何 preset（当前只在插件目录里）'))),
         errLine,
         h('div', { 'data-ms-sec': '' },
+          h('span', { 'data-ms-sec-title': '' }, '被遮蔽会话的记忆'),
+          h('div', { 'data-ms-note': '' },
+            '遮蔽会话自己可以有一套隔离记忆（配套包 dsh-memory-core）。装了就有这个入口：'),
+          h('div', { 'data-ms-row': '' },
+            h('a', {
+              href: '/api/memory-core/manage',
+              target: '_blank',
+              rel: 'noopener',
+              style: {
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                fontSize: '12px', minHeight: '26px', padding: '2px 12px',
+                borderRadius: '6px', textDecoration: 'none', cursor: 'pointer',
+                border: '1px solid var(--dsw-alias-brand-primary,#2f6fed)',
+                color: 'var(--dsw-alias-brand-primary,#2f6fed)',
+              },
+            }, '打开记忆管理页'),
+            h('span', { 'data-ms-note': '', style: { marginLeft: '8px' } },
+              '没装配套包时这个链接会 404')),
+          h('div', { 'data-ms-note': '' },
+            '管理页可查看各轨条数、新增/修改/归档条目、处理待确认队列，跟普通会话的记忆完全隔离。')),
+        h('div', { 'data-ms-sec': '' },
           h('span', { 'data-ms-sec-title': '' }, '怎么启用'),
           h('div', { 'data-ms-note': '' },
             '1. 打开「Agent 预设」，找到要用的 preset，在它的插件列表里加 dsh-memory-shield'),
@@ -256,6 +279,9 @@ function CopyButton(props) {
       )
     }
 
+    // 修复提示词：横幅里一键复制，让 agent 带着上下文去改，不靠用户自己读文档。
+    const COPY_FIX = '帮我修一下 dsh-memory-shield 的配置，它现在可能装错了层级。请分步做，每步先只读，我确认后再动：①读 ' + ORIGIN + '/api/memory-shield/state 与 /health，告诉我 layer、enabled、presetName、实际遮蔽了几个工具；②如果 layer 是 profile 且 enabled 为 true，说明它在全局遮蔽所有会话的记忆工具与上下文段，这是破坏性配置，把要关掉的插件列表开关和我要用的 preset 名字说清楚；③改之前先备份 profile 的 cordis.patch.yml（同目录加 .bak-时间戳），然后只在那个 preset 的 plugins 列表里加一项 - id: memory-shield / name: dsh-memory-shield / config: {enabled: true}，不要新建同名 preset 块（整块会替换掉其余插件），也不要加到 dsh.profile.bundles；④列给我「改了哪个文件、备份在哪、怎么重启（不要由你执行重启，会掐掉当前会话）、重启后新建哪个 preset 的会话、进去后怎么验证（/health 的 layer 应是 preset 且 shadowTools > 0）」。不要帮我改任何其他配置。'
+
     // 缺启用横幅（shell.overlay）
     function OverlayBanner() {
       const { state: st, error } = useShieldState()
@@ -264,12 +290,26 @@ function CopyButton(props) {
       // 读不到状态就不打扰（fetchState 已 warn）；读到了才按 enabled/hintDismissed 判断
       if (error) return null
       if (!st || dismissed) return null
+
+      // 红警：遮蔽在 profile 层生效＝全局遮蔽。所有会话的记忆注入与工具都被挡掉，
+      // 只剩遮蔽包自己的兜底，且改回来要重启，属于「必须立刻修好」的配置。
+      if (st.layer === 'profile' && st.enabled === true && (st.shadowTools || 0) > 0) {
+        return h('div', { 'data-ms-overlay': 'danger', role: 'alert' },
+          h('span', { 'data-ms-overlay-text': '' },
+            '⛔ 记忆遮蔽正在全局生效：所有会话的记忆上下文与记忆工具都被挡掉（当前遮蔽 ' + st.shadowTools + ' 个工具）。'),
+          h(CopyButton, { text: COPY_FIX, label: '复制修复提示词' }),
+          h('button', { 'data-ms-btn': '', onClick: () => setDismissed(true) }, '×'),
+        )
+      }
+
       if (st.enabled || st.hintDismissed) return null
 
-      return h('div', { 'data-ms-overlay': '' },
+      // 黄警：装好了但没在 preset 里启用。默认关闭是设计（不加就是零影响），
+      // 但要让人知道「现在等于没装」，并给一条能直接交给 agent 的修复路径。
+      return h('div', { 'data-ms-overlay': 'warn' },
         h('span', { 'data-ms-overlay-text': '' },
-          '记忆遮蔽插件已安装，但默认不启用。启用后它会挡住其他记忆插件往挂了它的 preset 下的会话注入的上下文与工具，让这些会话保持干净，所以默认关闭。启用方式：在目标 preset 的 plugins 列表加入 dsh-memory-shield，并在 config 里设 enabled: true。'),
-        h('button', { 'data-ms-btn': '', onClick: () => setDismissed(true) }, '×'),
+          '记忆遮蔽已安装但未启用：当前不遮蔽任何会话，等于没装。要用就在目标 preset 的 plugins 里挂载它并设 config.enabled: true；只打开插件列表的开关不算。'),
+        h(CopyButton, { text: COPY_FIX, label: '复制修复提示词' }),
         h('button', { 'data-ms-btn': '', onClick: async () => {
           try {
             await jpost('/config', { hintDismissed: true })

@@ -9,6 +9,7 @@ export const Config = z.object({
 	presetName: z.string().default(DEFAULTS.presetName),
 	memoryDir: z.string().default(DEFAULTS.memoryDir),
 	writeGuard: z.boolean().default(DEFAULTS.writeGuard),
+	perTurnWriteGuard: z.boolean().default(DEFAULTS.perTurnWriteGuard),
 	writeGuardThreshold: z.number().default(DEFAULTS.writeGuardThreshold),
 	snapshotOrder: z.number().default(DEFAULTS.snapshotOrder),
 });
