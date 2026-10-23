@@ -467,6 +467,9 @@ function apply(ctx, config) {
 					}
 										const agent = agentOf(ctx);
 					const cwd = agent?.session?.header?.cwd;
+					// HTTP 路由没有会话上下文：没带 ?cwd= 时拿不到 cwd，这是「未知」，不是「会话没有工作目录」。
+					// 单给一个字段，别让前端把「查不到」当「没有」去报警。
+					const cwdSource = url.searchParams.get("cwd") ? "query" : (cwd ? "session" : "unknown");
 					// 设置页面板改过的值每请求重读一次（与工具/注入同口径）
 					refreshLive();
 
@@ -485,6 +488,8 @@ function apply(ctx, config) {
 								bannerEnabled: s.bannerEnabled !== false,
 								presetName: s.presetName,
 								layer,
+								cwd: cwd ?? null,
+								cwdSource,
 								livePath: liveConfigPath(memoryDir),
 								live: readLiveConfig(memoryDir),
 							},

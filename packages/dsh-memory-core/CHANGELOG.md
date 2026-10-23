@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.7
+
+- 修 C6 误报：full 模式下把「HTTP 路由查不到 cwd」当成「会话没有工作目录」，横幅在每个会话都常驻。现在服务端给出 cwdSource 三态（query / session / unknown），只在明确「有会话但无 cwd」时告警。
+- /config 返回 cwd 与 cwdSource，面板不再拿 undefined 当 false。
+
 ## 0.1.6
 
 - 装配形态改为「装完即生效、零副作用」：去掉包内补丁的 disabled: true，改为 memoryEnabled 未开启时 apply 直接返回，工具、注入、路由、看门狗全不注册。装进 profile 后插件列表显示「已生效」，不会再被误读成「要重启」；普通会话完全不受影响。

@@ -204,14 +204,14 @@ window.__ModuleLoader__.load({
           h("div", { "data-pmc-lead": "" },
             "会话里用 memory_core 工具写入；管理页可新增、编辑、归档、删除，并处理待确认队列。")),
         h("div", { "data-pmc-sec": "" },
-          h("div", { "data-pmc-h": "" }, "插件列表里为什么显示「已关闭」"),
+          h("div", { "data-pmc-h": "" }, "插件列表显示已生效，这里为什么还是没有记忆"),
           h("div", { "data-pmc-lead": "" },
-            "包自带硬开关（patch 里 disabled: true）：装进 profile 只是加载，默认不跑，避免给所有会话都塞一套记忆。" +
-              "本页显示的状态来自 preset 里的显式挂载——只要这里的条数与路径是活的，就说明它在工作。" +
-              "列表上的开关作用于 profile 层：启用后所有会话都会使用这套记忆，通常不需要。"),
+            "包装进 profile 就会加载，但配置里 memoryEnabled 默认是 false，所以它只挂管理页路由，不注册工具、也不注入上下文。" +
+              "本页显示的状态来自当前 preset 的配置——只要这里的条数与路径是活的，就说明这个 preset 已经设了 memoryEnabled: true。" +
+              "列表上的开关作用于 profile 层：打开后所有会话都会使用这套记忆，通常不需要。"),
           h("div", { "data-pmc-desc": "" },
-            "警告：已通过 preset 挂载本包时，请勿再启用插件列表开关——两个实例会争用同一 /api/memory-core 路由，" +
-              "后挂载的 preset 会报 duplicate prefix route 并整体加载失败。若误开启，关闭开关并重启、重启，记忆数据不会丢失。")),
+            "警告：已通过 preset 挂载本包时，请勿再打开插件列表开关——两个实例会争用同一 /api/memory-core 路由，" +
+              "后挂载的 preset 会报 duplicate prefix route 并整体加载失败。若误开启，关闭开关并重启，记忆数据不会丢失。")),
         h("div", { "data-pmc-sec": "" },
           h("div", { "data-pmc-h": "" }, "看不懂？复制一条发给 agent"),
           h("div", { "data-pmc-desc": "" },
@@ -508,8 +508,9 @@ window.__ModuleLoader__.load({
             sub: "未修复的影响：你以为两个会话互相隔离，实际共享同一套记忆。请在 preset 里给 memory-core 设 config.presetName，或在配置页填写数据目录。",
             acts: ["fix", "manage", "learn"],
           });
-        } else if (c.memoryTracks === "full" && !c.cwd) {
-          // full（默认档）下 project 与 key 要靠会话 cwd 定位；没有 cwd 时两轨静默写不进去。
+        } else if (c.memoryTracks === "full" && c.cwdSource === "missing") {
+          // full（默认档）下 project 与 key 要靠会话 cwd 定位。
+          // 只在服务端明确「查到会话、但它没有 cwd」时报警；HTTP 路由查不到 cwd 属于未知，不能当成没有。
           setState({
             kind: "warn",
             top: "full 模式（默认）下当前会话没有工作目录：project 与 key 两轨无法定位文件。",
