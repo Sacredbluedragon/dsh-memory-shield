@@ -8,13 +8,6 @@
 export const TRACKS_LITE = ["memory", "user", "key"];
 export const TRACKS_FULL = ["memory", "user", "project", "key", "daily"];
 
-export const TRACK_FILES = {
-	memory: "memory.md",
-	user: "user.md",
-	project: "project.md",
-	key: "key.md",
-	daily: "daily.md",
-};
 export const TRACK_LABELS = {
 	memory: "长期记忆",
 	user: "用户档案",

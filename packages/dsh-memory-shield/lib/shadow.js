@@ -24,7 +24,7 @@ const ALLOWED_EXACT = new Set([
  * 保证同一会话内每次渲染字节完全一致（不打散 prompt 缓存）。
  */
 export const SHADOW_HINT =
-	"本会话已启用记忆遮蔽：其他记忆插件注入的记忆已被拦截（数据未删除）。" +
+	"本会话已启用记忆遮蔽：其他记忆插件的同名上下文段与记忆工具已被拦截（数据未删除；消息级注入不在遮蔽范围内）。" +
 	"配套的 dsh-memory-core 已发布，需要独立记忆时挂进同一 preset 即可用 memory_core。";
 
 export function isMemorySection(name) {
@@ -55,7 +55,7 @@ export function shadowTool(toolName, _s) {
 	return {
 		name: toolName,
 		description:
-			"该工具在当前 preset 中已被遮蔽，不可用。需要独立记忆时挂进 dsh-memory-core，用 memory_core。",
+			"该工具在当前 preset 中已被遮蔽，不可用。需要独立记忆时把 dsh-memory-core 挂进同一 preset，用 memory_core。",
 		parameters: {
 			type: "object",
 			properties: {},
@@ -78,7 +78,7 @@ export function shadowTool(toolName, _s) {
 				ok: false,
 				message:
 					`工具 ${toolName} 在当前 preset 中不可用（已被记忆遮蔽插件接管）。` +
-					"需要独立记忆时挂进 dsh-memory-core，用 memory_core。",
+					"需要独立记忆时把 dsh-memory-core 挂进同一 preset，用 memory_core。",
 			};
 		},
 	};
@@ -88,7 +88,7 @@ export function shadowTool(toolName, _s) {
 export function shadowDiagnoseTool(ctx, s) {
 	return {
 		name: "shadow_diagnose",
-		description: "查看 memory-shield 当前遮蔽状态：遮蔽了多少工具、多少 context、哪些在白名单。",
+		description: "查看 memory-shield 当前遮蔽状态：遮蔽了多少工具、多少个上下文段、白名单条数。",
 		parameters: { type: "object", properties: {} },
 		output: {
 			schema: {

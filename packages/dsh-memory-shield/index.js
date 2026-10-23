@@ -67,7 +67,7 @@ const inject = ["systemPrompt", "tools", "webServer"];
 const API_PREFIX = "/api/memory-shield";
 const MAX_BODY = 65536;
 /** POST /config 的字段白名单：只有这两个键允许改，其余一律 400。 */
-const CONFIG_KEYS = Object.freeze(["hintDismissed", "showInSettings"]);
+const CONFIG_KEYS = Object.freeze(["hintDismissed", "showInSettings", "bannerEnabled", "successShown"]);
 const API = {
 	routeBound: false,
 	instances: { profile: null, preset: null },
@@ -98,6 +98,24 @@ function readJsonBody(req) {
 		});
 		req.on("error", () => finish({ bad: "request stream error" }));
 	});
+}
+
+/**
+ * 同源闸：POST /config 会写本地文件，必须挡住跨站与跨源请求。
+ * 判定与 core 同口径（Origin 主机名须等于 Host；回环之间放行；sec-fetch-site 只认 same-origin/none）。
+ */
+const LOOPBACK = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
+function sameOriginBlocked(req) {
+	const host = String(req.headers?.host ?? "").split(":")[0];
+	const origin = req.headers?.origin;
+	if (origin) {
+		let oh = "";
+		try { oh = new URL(origin).hostname; } catch { return "非法 Origin 头"; }
+		if (oh !== host && !(LOOPBACK.has(host) && LOOPBACK.has(oh))) return "跨源访问被拒绝";
+	}
+	const site = req.headers?.["sec-fetch-site"];
+	if (site && site !== "same-origin" && site !== "none") return `跨站请求被拒绝（sec-fetch-site=${site}）`;
+	return null;
 }
 
 function makeApiHandler() {
@@ -135,7 +153,15 @@ function makeApiHandler() {
 					layer: inst?.layer ?? 'profile',
 					presetName: inst?.layer === 'preset' ? (cfg.presetName || 'default') : '',
 					enabled: cfg.enabled === true,
+					// 实际生效数：与 /health 同源。缺这两个字段时客户端读到的恒为 0，
+					// 会把「已就绪」判成「拦截了 0 个」，绿条永不出现、黄警常驻。
+					shadowTools: inst?.effective?.tools?.size ?? 0,
+					shadowSections: inst?.effective?.sections?.size ?? 0,
 					hintDismissed: ui.hintDismissed === true,
+					// 告警横幅总开关：关掉后黄警与「不再提示」都不渲染；红警（全局遮蔽）仍显示，安全优先。
+					bannerEnabled: ui.bannerEnabled !== false,
+					// 「遮蔽已就绪」绿条只弹一次：客户端点「知道了」后写这里。
+					successShown: ui.successShown === true,
 					showInSettings: ui.showInSettings !== false && cfg.showInSettings !== false,
 				},
 			});
@@ -143,6 +169,8 @@ function makeApiHandler() {
 		}
 
 		if (req.method === 'POST' && url.pathname === `${API_PREFIX}/config`) {
+			const blocked = sameOriginBlocked(req);
+			if (blocked) return json(403, { ok: false, why: blocked });
 			const parsed = await readJsonBody(req);
 			if (parsed.bad) return json(400, { ok: false, why: parsed.bad });
 			const body = parsed.value;

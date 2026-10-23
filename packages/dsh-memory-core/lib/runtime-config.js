@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 
 /** 允许从文件覆盖的键。其余键（presetName / memoryDir）只认 patch，避免面板改坏落点。 */
-export const LIVE_KEYS = ["memoryTracks", "writeGuard", "perTurnWriteGuard", "writeGuardThreshold", "snapshotOrder"];
+export const LIVE_KEYS = ["memoryTracks", "directMemory", "directUser", "directKey", "perTurnWriteGuard", "writeGuardThreshold", "snapshotOrder", "bannerEnabled", "loadedHintShown"];
 
 export function liveConfigPath(memoryDir) {
 	return join(dirname(memoryDir), "memory-core.config.json");
@@ -21,12 +21,17 @@ function pick(raw) {
 	const out = {};
 	const src = raw && typeof raw === "object" ? raw : {};
 	if (src.memoryTracks === "lite" || src.memoryTracks === "full") out.memoryTracks = src.memoryTracks;
-	if (typeof src.writeGuard === "boolean") out.writeGuard = src.writeGuard;
+	for (const k of ["directMemory", "directUser", "directKey"]) {
+		if (typeof src[k] === "boolean") out[k] = src[k];
+	}
 	if (typeof src.perTurnWriteGuard === "boolean") out.perTurnWriteGuard = src.perTurnWriteGuard;
 	if (Number.isInteger(src.writeGuardThreshold) && src.writeGuardThreshold >= 1) {
 		out.writeGuardThreshold = src.writeGuardThreshold;
 	}
 	if (Number.isInteger(src.snapshotOrder)) out.snapshotOrder = src.snapshotOrder;
+	if (typeof src.bannerEnabled === "boolean") out.bannerEnabled = src.bannerEnabled;
+	// 「已加载」绿条只弹一次：用户点「知道了」写这里，之后不再出现。
+	if (typeof src.loadedHintShown === "boolean") out.loadedHintShown = src.loadedHintShown;
 	return out;
 }
 

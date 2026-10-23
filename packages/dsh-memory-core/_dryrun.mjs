@@ -15,16 +15,16 @@
  */
 
 import * as nodeModule from "node:module";
-import { mkdtempSync, rmSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EventEmitter } from "node:events";
 
 import { DEFAULTS } from "./lib/defaults.js";
 import { MemoryStore, SuggestionQueue, ArchiveStore } from "./lib/store.js";
-import { renderSnapshot, renderResident, writeGuardNoticeFor } from "./lib/render.js";
+import { renderSnapshot, renderResident, writeGuardNoticeFor, writeGuideFor } from "./lib/render.js";
 import { TOTAL_BUDGET, BUDGETS } from "./lib/budgets.js";
-import { tracksOf, TRACK_FILES } from "./lib/tracks.js";
+import { tracksOf } from "./lib/tracks.js";
 
 // ── 依赖兜底 ────────────────────────────────────────────────────────────
 // index.js 末尾 `export { Config } from "./lib/schema.js"`，schema.js 依赖
@@ -229,7 +229,7 @@ try {
   console.log(`  node ${process.version} / schemastery ${depInstalled ? "已安装" : "未安装（已注入 stub）"}`);
   console.log(`  tmp = ${root}`);
 
-  apply(ctx, { memoryDir: dirLite, memoryTracks: "lite", perTurnWriteGuard: true });
+  apply(ctx, { memoryEnabled: true, memoryDir: dirLite, memoryTracks: "lite", perTurnWriteGuard: true, directKey: false });
   __resetInstance(); // 单例按进程去重：清空槽位，下一段 full 实例才能注册
 
   const tool = rec.tools[0];
@@ -241,15 +241,25 @@ try {
   ok("0c apply 注册了 webServer 路由", rec.web.length === 1 && typeof routeHandler === "function", 1, rec.web.length);
   ok("0d 注册了 agent/turn-stopping 看门狗处理器", (rec.handlers.get("agent/turn-stopping") ?? []).length === 1, 1, (rec.handlers.get("agent/turn-stopping") ?? []).length);
 
+  // 0e：未启用时必须零注册——这是「装进 profile 不影响任何普通会话」的产品承诺。
+  {
+    const off = makeCtx(makeAgent(join(root, "cwd-off")));
+    __resetInstance();
+    apply(off.ctx, { memoryDir: join(root, "off") });
+    const total = off.rec.tools.length + off.rec.injects.length + off.rec.web.length + (off.rec.handlers.get("agent/turn-stopping") ?? []).length;
+    ok("0e memoryEnabled=false 时零注册（工具/注入/路由/看门狗）", total === 0, 0, total);
+    __resetInstance();
+  }
+
   // ── R. 原有 11 项回归 ────────────────────────────────────────────────
   section("R. 原有 11 项回归（defaults / tracks / 实例化 / render）");
   ok("R1  memoryTracks 默认 = full（五轨）", DEFAULTS.memoryTracks === "full", "full", DEFAULTS.memoryTracks);
-  ok("R2  writeGuard 默认 = true", DEFAULTS.writeGuard === true, true, DEFAULTS.writeGuard);
+  ok("R2  三轨直接写入默认全开", DEFAULTS.directMemory === true && DEFAULTS.directUser === true && DEFAULTS.directKey === true, "true/true/true", `${DEFAULTS.directMemory}/${DEFAULTS.directUser}/${DEFAULTS.directKey}`);
   ok("R3  writeGuardThreshold 默认 = 2", DEFAULTS.writeGuardThreshold === 2, 2, DEFAULTS.writeGuardThreshold);
   ok("R4  snapshotOrder 默认 = 500", DEFAULTS.snapshotOrder === 500, 500, DEFAULTS.snapshotOrder);
   ok("R5  lite tracks = memory/user/key", tracksOf("lite").join("/") === "memory/user/key", "memory/user/key", tracksOf("lite"));
   ok("R6  full tracks = 5 条", tracksOf("full").length === 5, 5, tracksOf("full"));
-  ok("R7  TRACK_FILES = 5 项", Object.keys(TRACK_FILES).length === 5, 5, Object.keys(TRACK_FILES));
+  ok("R7  TRACK_FILES 已删（与实际 locate 不一致的死常量）", !("TRACK_FILES" in (await import("./lib/tracks.js"))), "无导出", "有导出");
   const storeR = new MemoryStore(join(root, "regress"), { injectionScan: false });
   ok("R8  MemoryStore 可实例化", storeR instanceof MemoryStore, "MemoryStore 实例", typeof storeR);
   const pendingR = new SuggestionQueue(join(root, "regress", "pending.md"));
@@ -311,7 +321,7 @@ try {
   ok("4c 归档轨读得到", archived.some((e) => e.includes(U4)), `memory-archive.md 含「${U4}」`, archived);
 
   // ── 5. 待确认队列 ────────────────────────────────────────────────────
-  section("5. 待确认队列（key 轨 writeGuard → pending → confirm）");
+  section("5. 待确认队列（directKey=false → pending → confirm）");
   const U5 = U("pend");
   const qRes = await tool.execute({ action: "add", target: "key", content: `待确认 ${U5}` }, { agent: agentA });
   ok("5a key 轨写入被拦截进队列", qRes?.ok === true && qRes?.queued === true, { ok: true, queued: true }, qRes);
@@ -414,6 +424,10 @@ try {
   const snapBrace = renderSnapshot(budgetStore, { ...DEFAULTS }, null, { agent: agentA });
   ok("6j 快照里不含未净化的 {{", !snapBrace.includes("{{"), "无 {{ 序列", snapBrace.includes("{{") ? snapBrace.slice(0, 200) : "ok");
   ok("6k 净化只降一层保留字面内容", snapBrace.includes("{session}"), "含 {session}", snapBrace.includes("{session}"));
+  // 6l 写引导必须按「target 是单轨」写：写「一次调用写两个轨」会让模型撞轨校验，
+  // 或把 project 的内容塞进 daily 静默写错轨。
+  const guideFull = writeGuideFor("full");
+  ok("6l full 写引导要求分两次调用", guideFull.includes("分两次") && !guideFull.includes("一次调用写"), "含「分两次」、不含「一次调用写」", guideFull);
   note(`未发现 2800 预算常量；代码实际为 TOTAL_BUDGET=${TOTAL_BUDGET}（lib/budgets.js:5），按此断言`);
 
   // ── 7. 目录隔离 ──────────────────────────────────────────────────────
@@ -435,7 +449,7 @@ try {
 
   // ── 8. 看门狗 ────────────────────────────────────────────────────────
   section("8. 看门狗（连续未写记忆 → 注入提醒）");
-  const NOTICE = "轮没写";
+  const NOTICE = "## 提醒";
   const onTurnStopping = (rec.handlers.get("agent/turn-stopping") ?? [])[0];
   // 干净起点：本段跑的是 lite 模式（没有 daily/project 轨可写），
   // 所以按 lite 的语义「任意轨写入即清零」，写一条 memory 把 wroteThisTurn 消耗掉
@@ -486,11 +500,27 @@ try {
   const badAction = await callApi(routeHandler, { method: "POST", url: "/api/memory-core/entry", body: { action: "nope" } });
   ok("9f POST /entry 未知 action 返回 400", badAction.status === 400, 400, badAction.status);
 
+  // 9f2 请求体上限：同源页面也可能被脚本灌大 body，超过 64 KB 要直接拒绝，不能全读进内存。
+  const huge = await callApi(routeHandler, {
+    method: "POST",
+    url: "/api/memory-core/entry",
+    body: { action: "add", track: "memory", content: "x".repeat(70000) },
+  });
+  ok("9f2 超大请求体返回 413", huge.status === 413, 413, huge.status);
+
   const notFound = await callApi(routeHandler, { url: "/api/memory-core/nope" });
   ok("9g 未知路径返回 404", notFound.status === 404, 404, notFound.status);
 
   const filesApi = await callApi(routeHandler, { url: "/api/memory-core/files" });
   ok("9h GET /files 返回每轨行", filesApi.status === 200 && (filesApi.json?.data?.rows ?? []).length === 3, "200 + 3 行（lite）", { status: filesApi.status, rows: filesApi.json?.data?.rows?.length });
+
+  // 9h2 子代理只读：不光是 add，remove/archive 这类破坏性操作也要被挡住，
+  // 否则「子代理只读」名不副实（wb P1-1）。
+  const sub = makeAgent(cwdA, "subagent");
+  await tool.execute({ action: "add", target: "memory", content: `子代理前置 ${U("sub-pre")}` }, { agent: agentA });
+  const subRemove = await tool.execute({ action: "remove", target: "memory", match: `子代理前置 ${U("sub-pre")}` }, { agent: sub });
+  const subList = await tool.execute({ action: "list", target: "memory" }, { agent: sub });
+  ok("9h2 子代理 remove 被拒、list 放行", subRemove?.ok === false && subList?.ok !== false, "remove 拒 / list 放行", { remove: subRemove?.ok, list: subList?.ok });
 
   const filesCwd = await callApi(routeHandler, { url: `/api/memory-core/files?cwd=${encodeURIComponent(cwdA)}` });
   ok("9i GET /files?cwd 带回 cwd", filesCwd.status === 200 && filesCwd.json?.data?.cwd === cwdA, cwdA, filesCwd.json?.data?.cwd);
@@ -533,10 +563,18 @@ try {
   ok("9m /status 带 layer 字段（默认 presetName=default 判 profile）", status.json?.data?.layer === "profile", "profile", status.json?.data?.layer);
   const clientSrc = readFileSync(new URL("./client.js", import.meta.url), "utf8");
   ok(
-    "9n client.js 注册 shell.overlay 横幅且含黄/红两档文案",
-    /shell\.overlay/.test(clientSrc) && /data-pmc-banner/.test(clientSrc) && /layer === "profile"/.test(clientSrc) && /全局生效|全局破坏/.test(clientSrc),
+    "9n client.js 注册 shell.overlay 横幅且含黄/红两档文案",    /shell\.overlay/.test(clientSrc) && /data-pmc-banner/.test(clientSrc) && /layer === "profile"/.test(clientSrc) && /全局生效|全局破坏/.test(clientSrc),
     "含 shell.overlay + 两档文案",
     { overlay: /shell\.overlay/.test(clientSrc), banner: /data-pmc-banner/.test(clientSrc) },
+  );
+
+  // 9o full（默认档）下 project/key 靠 cwd 定位，工具必须能显式传 cwd，
+  // 否则「没有工作目录的会话」写这两轨必抛，而模型没有别的办法补。
+  ok(
+    "9p memory_core 暴露 cwd 参数",
+    Object.keys(tool?.parameters?.properties ?? {}).includes("cwd") && String(tool?.parameters?.properties?.cwd?.description ?? "").includes("项目"),
+    "schema 含 cwd",
+    Object.keys(tool?.parameters?.properties ?? {}),
   );
 
   // ── 10. 模式与 enabled ───────────────────────────────────────────────
@@ -546,7 +584,7 @@ try {
   const dirFull = join(root, "full");
   const agentF = makeAgent(join(root, "cwd-full"));
   const { ctx: ctxFull, rec: recFull } = makeCtx(agentF);
-  apply(ctxFull, { memoryDir: dirFull, memoryTracks: "full" });
+  apply(ctxFull, { memoryEnabled: true, memoryDir: dirFull, memoryTracks: "full" });
   const statusFull = await callApi(recFull.web[0].handler, { url: "/api/memory-core/status" });
   ok("10b full 模式 tracks = memory/user/project/key/daily", (statusFull.json?.data?.tracks ?? []).join("/") === "memory/user/project/key/daily", "memory/user/project/key/daily", statusFull.json?.data?.tracks);
 
@@ -565,8 +603,8 @@ try {
   __resetInstance();
   const { ctx: ctxI1, rec: recI1 } = makeCtx(makeAgent(join(root, "cwd-i1")));
   const { ctx: ctxI2, rec: recI2 } = makeCtx(makeAgent(join(root, "cwd-i2")));
-  apply(ctxI1, { memoryDir: join(root, "inst-1") });
-  apply(ctxI2, { memoryDir: join(root, "inst-2") });
+  apply(ctxI1, { memoryEnabled: true, memoryDir: join(root, "inst-1") });
+  apply(ctxI2, { memoryEnabled: true, memoryDir: join(root, "inst-2") });
   ok(
     "10e 第二个实例不注册工具/注入/路由",
     recI1.tools.length === 1 && recI1.injects.length === 1 && recI1.web.length === 1 &&
@@ -576,6 +614,126 @@ try {
   );
 
   note("未发现 enabled / 关闭记忆的配置项：lib/schema.js 的 Config 只有 memoryTracks/presetName/memoryDir/writeGuard/writeGuardThreshold/snapshotOrder；index.js apply() 无条件注册工具与注入。因此「不启用记忆时工具/注入是否注册」无对应分支，无法断言——缺该能力");
+
+  // 10f/10g 横幅与徽章（wb 横幅测试 C4/C8、P2-N1）
+  ok(
+    "10f /status 带 bannerEnabled 与 pendingKey",
+    statusFull.json?.data?.bannerEnabled === true && typeof statusFull.json?.data?.pendingKey === "number",
+    { bannerEnabled: true, pendingKey: "number" },
+    { bannerEnabled: statusFull.json?.data?.bannerEnabled, pendingKey: statusFull.json?.data?.pendingKey },
+  );
+  {
+    const clientSrc = readFileSync(new URL("./client.js", import.meta.url), "utf8");
+    ok(
+      "10l 待确认黄警按三轨总数（不再只盯 key）",
+      clientSrc.includes("pendingTotal") && !clientSrc.includes("c.pendingKey || 0) >= 3"),
+      "含 pendingTotal 且旧判据已删",
+      clientSrc.includes("pendingTotal"),
+    );
+    const manageSrc = readFileSync(new URL("./manage.html", import.meta.url), "utf8");
+    ok(
+      "10m 管理页有 load() 刷新入口（刷新按钮/切目录都会调它）",
+      /async function load\(\)/.test(manageSrc) && manageSrc.includes('id="refresh-all"'),
+      "load() 已定义且刷新按钮存在",
+      /async function load\(\)/.test(manageSrc),
+    );
+    ok(
+      "10n 管理页回显 cwd 来源（防止静默读写别的项目）",
+      manageSrc.includes("cwdSource") && manageSrc.includes("来自最近工作目录"),
+      "含 cwdSource 与来源提示",
+      manageSrc.includes("cwdSource"),
+    );
+    ok(
+      "10o lite 模式 /entries 拒绝未启用轨",
+      /tracksOf\(s\.memoryTracks\)\.includes\(track\)/.test(readFileSync(new URL("./index.js", import.meta.url), "utf8")),
+      "含轨校验",
+      false,
+    );
+    ok(
+      "10g 客户端注册 plugins.detail.badge 徽章",
+      clientSrc.includes('"plugins.detail.badge"') && clientSrc.includes("DetailBadge"),
+      "含槽位注册与组件",
+      clientSrc.includes('"plugins.detail.badge"'),
+    );
+    ok(
+      "10h 七条使用期提示词都在，且 COPY_FIX 要求不自己重启",
+      ["COPY_FIX", "COPY_UNDERSTAND", "COPY_HELP", "COPY_TRACK", "COPY_FORGET", "COPY_PENDING", "COPY_REVIEW", "COPY_PAGE_ERROR"].every((k) => clientSrc.includes(`const ${k} =`)) &&
+        clientSrc.includes("不要自己重启"),
+      "8 个 COPY 常量 + 不自己重启",
+      ["COPY_FIX", "COPY_UNDERSTAND", "COPY_HELP", "COPY_TRACK", "COPY_FORGET", "COPY_PENDING", "COPY_REVIEW", "COPY_PAGE_ERROR"].filter((k) => !clientSrc.includes(`const ${k} =`)),
+    );
+    ok(
+      "10i 指南覆盖「已关闭解释 + 复制给 agent」两段",
+      clientSrc.includes("插件列表里为什么显示「已关闭」") && clientSrc.includes("看不懂？复制一条发给 agent"),
+      "两段标题都在",
+      { 已关闭解释: clientSrc.includes("插件列表里为什么显示「已关闭」"), 复制给agent: clientSrc.includes("看不懂？复制一条发给 agent") },
+    );
+    ok(
+      "10j 绿条：loadedHintShown 贯通 defaults/schema/index/runtime-config/client，且「知道了」写回",
+      clientSrc.includes('kind: "ok"') &&
+        clientSrc.includes("loadedHintShown") &&
+        readFileSync(new URL("./lib/defaults.js", import.meta.url), "utf8").includes("loadedHintShown") &&
+        readFileSync(new URL("./lib/schema.js", import.meta.url), "utf8").includes("loadedHintShown") &&
+        readFileSync(new URL("./index.js", import.meta.url), "utf8").includes("loadedHintShown") &&
+        readFileSync(new URL("./lib/runtime-config.js", import.meta.url), "utf8").includes("loadedHintShown"),
+      "五处都有这个键",
+      ["client.js", "lib/defaults.js", "lib/schema.js", "index.js", "lib/runtime-config.js"]
+        .filter((f) => !readFileSync(new URL(`./${f}`, import.meta.url), "utf8").includes("loadedHintShown")),
+    );
+    ok(
+      "10k 黄警分支都带「复制修复提示词」（acts 以 fix 开头）",
+      (clientSrc.match(/acts: \["fix"/g) || []).length >= 7,
+      ">=7 处",
+      (clientSrc.match(/acts: \["fix"/g) || []).length,
+    );
+  }
+
+  // ── 11) add 的返回透传与漂移守卫 ──────────────────────────────────
+  section("11) add 返回透传与 drift 拒绝");
+  {
+    const dir = mkdtempSync(join(root, "s11-"));
+    const store = new MemoryStore(dir, { memoryTracks: "full" });
+    const agent = makeAgent(dir);
+    const text = U("dup");
+    const first = store.add("memory", text, agent);
+    ok("11a 首次写入 ok", first.ok === true, "ok=true", first.message);
+    const second = store.add("memory", text, agent);
+    ok("11b 重复写入带 duplicate 标记", second.ok === true && second.duplicate === true, "ok=true, duplicate=true", second.message);
+    ok("11c 重复不追加", store.entriesOf("memory", agent).length === 1, "1 条", store.entriesOf("memory", agent).length);
+
+    // 需要两条才有分隔符可改坏。
+    store.add("memory", U("second"), agent);
+    // 模拟外部编辑器把分隔符改坏：add 走带守卫的 reload，必须拒绝而不是全量重写。
+    const file = store.pathOf("memory", agent);
+    const broken = readFileSync(file, "utf8").replace(/\n§\n/g, "\n§ \n");
+    ok("11d0 造出坏格式（含 § 行）", broken !== readFileSync(file, "utf8") && /^\s*§ $/m.test(broken), "分隔符行变成 § ", broken.split("\n").filter((x) => x.includes("§")));
+    writeFileSync(file, broken);
+    const before = readFileSync(file, "utf8");
+    const drift = store.add("memory", U("drift"), agent);
+    ok("11d 格式漂移时拒绝写入", drift.ok === false && /格式异常/.test(drift.message ?? ""), "ok=false 且提示格式异常", drift.message);
+    ok("11e 拒绝后原文件未被改写", readFileSync(file, "utf8") === before, "字节不变", readFileSync(file, "utf8").length);
+    const backups = readdirSync(dir).filter((f) => f.includes(".bak."));
+    ok("11f 漂移时留下备份", backups.length >= 1, ">=1 个 .bak", backups);
+  }
+
+  // ── 12) 工具层与横幅：透传 duplicate、presetName 告警 ────────────────
+  section("12) 工具层透传与 presetName 告警");
+  {
+    const idxSrc = readFileSync(new URL("./index.js", import.meta.url), "utf8");
+    ok(
+      "12a 工具层透传 duplicate（不再自己拼假成功）",
+      idxSrc.includes("duplicate: dupCount === written.length") && idxSrc.includes("与已有记忆重复，未写入"),
+      "两处都在",
+      { duplicate: idxSrc.includes("duplicate: dupCount === written.length"), text: idxSrc.includes("与已有记忆重复，未写入") },
+    );
+    const clientSrc = readFileSync(new URL("./client.js", import.meta.url), "utf8");
+    ok(
+      "12b 横幅提示未配置 presetName",
+      clientSrc.includes('c.presetName === "default"') && clientSrc.includes("多个 preset 会共用同一份记忆"),
+      "分支与文案都在",
+      clientSrc.includes('c.presetName === "default"'),
+    );
+  }
 
   // ── 汇总 ────────────────────────────────────────────────────────────
   section("result");

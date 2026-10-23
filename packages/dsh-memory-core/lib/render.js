@@ -10,19 +10,22 @@ import { ENTRY_DELIMITER } from "./store.js";
 import { TRACK_LABELS, tracksOf } from "./tracks.js";
 import { BUDGETS, TOTAL_BUDGET, KEY_TOP_N, KEY_SCAN_N, KEY_HOT_WORDS } from "./budgets.js";
 
-/** 写引导：按启用轨给出收尾动作，full 模式强调 daily + project 一次批量写。 */
+/** 写引导：按启用轨给出收尾动作，full 模式强调 daily 与 project 各写一次（target 是单值）。 */
 export function writeGuideFor(memoryTracks) {
 	const tracks = tracksOf(memoryTracks);
 	const hasProject = tracks.includes("project");
 	const hasDaily = tracks.includes("daily");
 	if (hasProject && hasDaily) {
+		// target 只能取一个轨，entries 也只写同一个轨：这条引导如果写「一次调用写两个轨」，
+		// 模型要么撞枚举/轨校验错误，要么把 project 的内容塞进 daily 静默写错轨。
 		return (
 			"## 每轮收尾\n" +
-			"用 memory_core 工具写一条：一次调用写 daily（今天做了什么）与 project（本项目的进展/决策/坑），" +
+			"用 memory_core 工具写记忆。每次调用只能写一个轨，所以收尾分两次：" +
+			"先 `target: \"daily\"` 写今天做了什么，再 `target: \"project\"` 写本项目的进展、决策与坑。" +
 			"重要事实写 `key`，用户偏好写 `user`，长期记忆写 `memory`。"
 		);
 	}
-	return "## 每轮收尾\n用 memory_core 工具写一条：重要事实写 `key`，用户偏好写 `user`，长期记忆写 `memory`。";
+	return "## 每轮收尾\n用 memory_core 按内容分别写入：重要事实写 `key`，用户偏好写 `user`，长期记忆写 `memory`。";
 }
 
 /** 看门狗提醒：说明盯的是哪几轨、阈值是多少，并指向补写。 */
@@ -30,7 +33,7 @@ export function writeGuardNoticeFor(memoryTracks, threshold) {
 	const tracks = tracksOf(memoryTracks);
 	const duty = tracks.includes("daily") ? "daily / project" : "memory / user / key";
 	return (
-		`## 提醒\n连续 ${threshold} 轮没写 ${duty} 记忆了。收尾时用 memory_core 工具写一条，把这几轮的进展补上。`
+		`## 提醒\n连续 ${threshold} 轮没有写入 ${duty}。收尾时用 memory_core 补上这几轮的进展。`
 	);
 }
 

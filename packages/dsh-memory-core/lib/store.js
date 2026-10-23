@@ -192,6 +192,15 @@ export function isCanonical(text) {
   return text.trim() === '' || serializeEntries(parseEntries(text)) === text
 }
 
+/**
+ * 外部编辑器常把分隔符改成 `§ `（行尾多空格）或让正文里混进 `§`：
+ * 这种情况下 parseEntries 可能整段当一个条目，重构后又恰好等于原文，
+ * 单靠 isCanonical 判不出来。这里单独查「看起来像分隔符但不规范」的行。
+ */
+export function hasSuspectSeparator(text) {
+  return text.split(/\r?\n/).some((line) => /^\s*§/.test(line) && line !== '§')
+}
+
 /** Blocking sleep used by the lock retry loop. */
 function sleep(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
@@ -251,7 +260,7 @@ export function withLock(dir, fn) {
     if (acquired) break
     if (isStaleLock(lockPath)) rmSync(lockPath, { force: true })
     if (Date.now() >= deadline) {
-      throw new Error('dsh-memory-shield: timed out waiting for the memory lock')
+      throw new Error('dsh-memory-core: timed out waiting for the memory lock')
     }
     sleep(LOCK_RETRY_MS)
   }
@@ -396,7 +405,7 @@ export class MemoryStore {
         return { dir: join(this.dir, 'projects', projectHash(cwd)), file: 'memory.md' }
       }
       default:
-        throw new Error(`dsh-memory-shield: 无效的记忆轨 "${target}"`)
+        throw new Error(`dsh-memory-core: 无效的记忆轨 "${target}"`)
     }
   }
 
@@ -404,7 +413,7 @@ export class MemoryStore {
   resolveTarget(target, agent) {
     const loc = this.locate(target, agent)
     if (!loc) {
-      throw new Error(`dsh-memory-shield: 无法定位记忆轨 "${target}"（项目记忆需要有效的会话工作目录）`)
+      throw new Error(`dsh-memory-core: 无法定位记忆轨 "${target}"（项目记忆需要有效的会话工作目录）`)
     }
     return loc
   }
@@ -542,7 +551,7 @@ export class MemoryStore {
   reload(target, agent) {
     const { text, size } = this.readRaw(target, agent)
     if (text === '' && size > 0) return { kind: 'read-failed' }
-    if (!isCanonical(text)) {
+    if (!isCanonical(text) || hasSuspectSeparator(text)) {
       const backup = `${this.pathOf(target, agent)}.bak.${Date.now()}`
       writeFileSync(backup, text)
       return { kind: 'drift', backup }
@@ -579,9 +588,14 @@ export class MemoryStore {
     }
     const stamped = this.stampEntry(target, text, agent)
     return withLock(loc.dir, () => {
-      const reload = this.reloadForAppend(target, agent)
+      const reload = this.reload(target, agent)
       if (reload.kind === 'read-failed') {
         return { ok: false, message: '文件存在但读不出内容（疑似编码损坏），已拒绝写入（防止清空历史）', target }
+      }
+      if (reload.kind === 'drift') {
+        // 外部编辑把分隔符/编码改坏了：此时全量重写会丢掉解析不出来的部分。
+        // 备份已在 reload() 里落盘，这里只拒绝写入，不动原文件。
+        return { ok: false, message: `文件格式异常（可能是外部编辑导致），已备份到 ${reload.backup}，本次未写入`, target }
       }
       const entries = reload.entries
       const syncedTrack = this.entryIdMode === 'on' && (target === 'key' || target === 'project')
@@ -885,13 +899,13 @@ export class ArchiveStore {
     if (target === 'memory') return join(this.dir, 'memory-archive.md')
     if (target === 'user') return join(this.dir, 'user-archive.md')
     if (target === 'key') {
-      if (!cwd) throw new Error('dsh-memory-shield: key 归档需要会话工作目录')
+      if (!cwd) throw new Error('dsh-memory-core: key 归档需要会话工作目录')
       return join(this.dir, 'projects', projectHash(cwd), 'key-archive.md')
     }
     if (typeof target === 'string' && target.startsWith('todo-')) {
       return join(this.dir, 'todo-archive.md')
     }
-    throw new Error(`dsh-memory-shield: 无效的归档轨 "${target}"`)
+    throw new Error(`dsh-memory-core: 无效的归档轨 "${target}"`)
   }
 
   /** Read one archive track's entries; a missing file reads as empty. */

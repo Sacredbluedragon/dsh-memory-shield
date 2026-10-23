@@ -60,6 +60,12 @@ check("P2-5 README 列出 dsh-memories 前缀", readmeSrc.includes("dsh-memories
 check("P2-5 README 单独列出 dsh-memo 前缀", readmeSrc.includes("、dsh-memo "));
 check("P2-5 前缀白名单含 dsh-memories/dsh-memo", isMemorySection("dsh-memories:context") && isMemorySection("dsh-memo:context"));
 
+// 4d. 绿条（2026-10-23）：遮蔽正常但没出过告警时给一次成功提示，只弹一次。
+const indexSrc = readFileSync(join(HERE, "index.js"), "utf8");
+check("绿条分支渲染 data-ms-overlay='ok' 且带「知道了」", clientSrc.includes("data-ms-overlay': 'ok'") && clientSrc.includes("知道了"));
+check("successShown 贯通 CONFIG_KEYS 与 /state", /CONFIG_KEYS[\s\S]{0,200}successShown/.test(indexSrc) && /successShown:\s*ui\.successShown/.test(indexSrc));
+check("「不再提示」优先于绿条", clientSrc.indexOf("if (st.hintDismissed) return null") < clientSrc.indexOf("data-ms-overlay': 'ok'"));
+
 // 5. 模拟 ctx 跑一次 apply（enabled=true）
 const calls = { effects: [], tools: [], contexts: [], logs: [] };
 const fakeCtx = {
@@ -121,6 +127,35 @@ apply(fakeCtx4, { enabled: true });
 check("profile 层注册状态路由", calls4.routes.includes("/api/memory-shield"), `${calls4.routes.length} 条`);
 check("profile 层不注册 diagnostic tool", !calls4.tools.includes("shadow_diagnose"));
 check("profile 层不遮蔽（即使 enabled=true）", !calls4.effects.some((t) => t.includes("shadow section") || t.includes("shadow tool")), `${calls4.effects.length} 个 effect`);
+
+// POST /config 会写本地 ui-config.json，必须和 core 同标准的同源闸（wb P1-5）。
+{
+	const src = readFileSync(new URL("./index.js", import.meta.url), "utf8");
+	const idx = src.indexOf("`${API_PREFIX}/config`");
+	const branch = idx >= 0 ? src.slice(idx, idx + 400) : "";
+	check("POST /config 前做同源校验", branch.includes("sameOriginBlocked(req)"), "分支内含 sameOriginBlocked");
+}
+
+// 横幅覆盖（wb 横幅测试 S1 / S7 / P1-N3、P1-1 两稿分离）
+{
+	const isrc = readFileSync(new URL("./index.js", import.meta.url), "utf8");
+	const csrc = readFileSync(new URL("./client.js", import.meta.url), "utf8");
+	check("ui-config 白名单含 bannerEnabled", /CONFIG_KEYS = Object\.freeze\(\[[^\]]*bannerEnabled/.test(isrc), "白名单含 bannerEnabled");
+	check("/state 返回 bannerEnabled", /bannerEnabled: ui\.bannerEnabled/.test(isrc), "state 含字段");
+	check("横幅两稿分离（红/黄）", csrc.includes("COPY_FIX_DANGER") && csrc.includes("COPY_FIX_WARN"), "两个常量都在");
+	check("横幅有总开关与恢复入口", csrc.includes("bannerEnabled") && csrc.includes("hintDismissed: false"), "开关 + 恢复");
+	check("状态读取失败给黄警与重试", csrc.includes("无法读取 dsh-memory-shield 状态") && csrc.includes("onClick: reload"), "S1 分支");
+	check("enabled 但遮蔽数为 0 给黄警", csrc.includes("未拦截任何工具或上下文段"), "S7 分支");
+	// 数据源：/state 必须给出实际遮蔽数，否则客户端读到的恒为 0，绿条永不出现、黄警常驻。
+	check("/state 返回实际遮蔽数（与 /health 同源）",
+		/shadowTools:\s*inst\?\.effective\?\.tools\?\.size/.test(isrc) &&
+		/shadowSections:\s*inst\?\.effective\?\.sections\?\.size/.test(isrc),
+		"state 含 shadowTools/shadowSections");
+	// 详情页徽章：profile 层 enabled 恒 false，必须问 /health 拿生效实例的状态。
+	check("详情页徽章按 /health 判定",
+		/memory-shield\/health/.test(csrc) && /probe\.enabled === true/.test(csrc),
+		"徽章读生效实例");
+}
 
 // 总结
 const failed = results.filter((r) => !r.ok);

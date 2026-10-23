@@ -2,9 +2,9 @@
 
 在指定 DSH preset 里挡掉其他记忆插件的上下文段与工具，让那个会话拿到干净上下文。
 
-它不存记忆、不写文件、不提供新能力，只做遮蔽。
+它不存记忆、不提供新能力，只做遮蔽；唯一会写的文件是面板偏好 `ui-config.json`（横幅开关、提示已读标记）。
 
-![version](https://img.shields.io/badge/version-0.1.11-blue)
+![version](https://img.shields.io/badge/version-0.1.12-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 > [!IMPORTANT]
@@ -14,7 +14,7 @@
 
 ## 它解决什么
 
-装了记忆插件（memory-evolve、prime-memory、auto-memory 等）之后，它们会把记忆注入到所有会话。某些 preset 不该吃这些注入，应该有自己独立的上下文。
+装了记忆插件（memory-evolve、prime-memory、auto-memory 等）之后，它们会把记忆注入到挂载它们的会话。某些 preset 不该吃这些注入，应该有自己独立的上下文。
 
 这个插件在指定 preset 里用同名覆盖挡住这些注入和工具，其他插件本体不动。
 
@@ -67,7 +67,9 @@ dsh plugin --profile web add dsh-memory-shield
 | `shadowSections` | `memory:snapshot` / `prompt:injections` | 按 context 段名精确遮蔽 |
 | `autoShadow` | `true` | 追加常见 `memory_*` / `memoir_*` 工具名与常见记忆 section |
 | `shadowWhitelist` | `[]` | 不遮蔽的名字（对精确与自动名单统一生效） |
-| `hintDismissed` | `false` | 提示横幅是否已被关掉 |
+| `bannerEnabled` | `true` | 黄色告警横幅总开关（红警不受约束） |
+| `successShown` | `false` | 「遮蔽已就绪」绿条是否已确认过 |
+| `hintDismissed` | `false` | 旧字段，仍兼容；现在点「不再提示」写的是 `bannerEnabled` |
 | `showInSettings` | `true` | 设置页是否也显示这块面板 |
 
 ## 遮蔽了什么
@@ -97,7 +99,7 @@ dsh plugin --profile web add dsh-memory-shield
 两条路：
 
 - 插件详情页面板：显示当前是否启用、怎么启用；
-- 让 agent 调 `shadow_diagnose`：返回遮蔽了多少工具、多少 context、白名单里有什么。
+- 让 agent 调 `shadow_diagnose`：返回遮蔽了多少工具、多少个上下文段，以及白名单条数。
 
 ## 自测
 
@@ -107,7 +109,7 @@ dsh plugin --profile web add dsh-memory-shield
 node _dryrun.mjs
 ```
 
-它用 `os.tmpdir()` 落盘、跑完删除，不碰真实的 `DSH_HOME`。
+它用纯内存 stub 模拟宿主与 HTTP，不落盘、不碰真实的 `DSH_HOME`。
 
 ## 项目结构
 

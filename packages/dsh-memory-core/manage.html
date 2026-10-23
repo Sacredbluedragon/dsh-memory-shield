@@ -100,6 +100,9 @@
     margin-bottom: 10px;
   }
   .cwdline { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+  .writebar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 4px 0 12px; font-size: 13px; color: var(--muted); }
+  .writebar label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; color: var(--text); }
+  .writebar .hint { color: var(--muted); }
   .cwdline code { font-family: ui-monospace, Consolas, monospace; color: var(--text); }
   .cwdline #cwd-input { width: 320px; max-width: 55vw; font-size: 13px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--text); margin-right: 6px; }
   .mini { font-size: 12px; padding: 3px 10px; border: 1px solid var(--border); background: #fff; border-radius: 6px; cursor: pointer; color: var(--text); }
@@ -234,6 +237,7 @@
   <div class="head-row">
     <h1>遮蔽会话记忆</h1>
     <div class="status-line">
+      <button class="mini" id="refresh-all" title="重新读取状态、条数与当前页签">刷新</button>
       <span class="chip ok" id="chip-mode"></span>
       <span class="chip" id="chip-tracks"></span>
       <span class="chip" id="chip-preset"></span>
@@ -248,7 +252,7 @@
   <div class="desc" id="desc"></div>
   <div class="filebar" id="filebar" style="display:none">
     <span class="name" id="file-title"></span>
-    <span class="chip" id="file-mode">结构化</span>
+    <span class="chip" id="file-mode">按轨查看</span>
     <span class="chip" id="file-count"></span>
     <span class="path" id="file-path"></span>
     <span class="spacer"></span>
@@ -257,8 +261,8 @@
   </div>
   <div class="viewbar" id="viewbar" style="display:none">
     <span class="seg">
-      <button id="view-pretty" class="active">美观视图</button>
-      <button id="view-raw">纯文本视图</button>
+      <button id="view-pretty" class="active">卡片视图</button>
+      <button id="view-raw">原文视图</button>
     </span>
     <input id="search" placeholder="搜索内容、时间或标签…">
   </div>
@@ -276,20 +280,23 @@
   var state = {
     status: null,
     rows: [],
-    tab: null,
+    tab: params.get("tab") || null,
     view: "pretty",
     query: "",
     page: 1,
-    cwd: params.get("cwd") || localStorage.getItem("pmc-cwd") || "",
+    // 只有 URL 明确带 cwd 才用它；localStorage 只回填输入框，不参与请求。
+    // 否则在 B 项目存过一次后，从 A 项目打开页面会静默读写 B 的目录。
+    cwd: params.get("cwd") || "",
+    cwdSource: params.get("cwd") ? "param" : null,
     cache: {},
   };
 
   // 页签顺序与 evolve 记忆页一致；AGENTS 不属于本包（全局规则由 dsh-agent-instructions 管），不设页签。
   var TABS = [
     { key: "guide", title: "指南" },
-    { key: "pending", title: "待确认记忆建议", desc: "写入后需人工确认的条目（如 key 轨的 writeGuard）。确认即写入对应轨，拒绝即丢弃。" },
+    { key: "pending", title: "待确认记忆", desc: "写入后需人工确认的条目（在配置页或本页关掉某轨的「直接写入」后，那一轨的写入会先落到这里）。确认即写入对应轨，拒绝即丢弃。" },
     { key: "project", title: "项目日志", track: "project", desc: "每回合收尾自动记录本回合进展；不注入上下文，模型按需读取。" },
-    { key: "key", title: "项目关键记忆 KEY.md", track: "key", desc: "下次会话不知道就会做错的事实（判据、坑、口径、约定）；注入摘要，写入需确认。" },
+    { key: "key", title: "项目关键记忆 KEY.md", track: "key", desc: "下次会话不知道就会做错的事实（判据、坑、口径、约定）；注入摘要；默认直接写入，可在配置页改为先确认。" },
     { key: "archive:key", title: "项目关键记忆归档 KEY-archive.md", track: "key", archived: true, desc: "已归档的项目关键记忆，不注入任何会话，可移回主轨。" },
     { key: "daily", title: "今日日志", track: "daily", desc: "按天记录当天进展；不注入上下文，模型按需读取。" },
     { key: "user", title: "用户档案 USER.md", track: "user", desc: "关于用户的稳定事实与偏好；每轮注入上下文。" },
@@ -344,29 +351,100 @@
     var files = await api(rowsUrl());
     state.status = files.data;
     state.rows = files.data.rows || [];
+    // 请求没带 cwd 时，服务端会依次用会话目录、最近工作目录兜底；把它回显出来并标注来源，
+    // 避免「看着是 A 项目、实际读写 B 项目」。
+    if (!state.cwd && files.data.cwd) {
+      state.cwd = files.data.cwd;
+      state.cwdSource = files.data.cwdSource || "session";
+    }
+    try {
+      var cfgRes = await api("/api/memory-core/config" + (state.cwd ? "?cwd=" + encodeURIComponent(state.cwd) : ""));
+      state.cfg = cfgRes.data;
+    } catch (e) { state.cfg = null; }
     renderHeader();
     renderTabs();
+    // 有待确认时先看待确认：那是唯一需要人做决定的地方，其余页签都是只读查看。
+    var pendingTotal = (state.rows || []).reduce(function (n, r) { return n + (Number(r.pending) || 0); }, 0);
+    if (pendingTotal > 0) { await switchTab(tabOf("pending").key); return; }
     var first = tabOf("project");
     var projectRow = rowOf("project");
     if (!projectRow || !projectRow.available) first = tabOf("memory");
     await switchTab(first.key);
   }
 
+  /** 重新读状态与条数并重画，停在当前页签（刷新按钮、切换目录都用它）。 */
+  async function load() {
+    state.cache = {};
+    try {
+      var files = await api(rowsUrl());
+      state.status = files.data;
+      state.rows = files.data.rows || [];
+      if (!state.cwd && files.data.cwd) {
+        state.cwd = files.data.cwd;
+        state.cwdSource = files.data.cwdSource || "session";
+      }
+    } catch (e) {
+      toast("读取失败：" + e.message);
+      return;
+    }
+    try {
+      var cfgRes = await api("/api/memory-core/config" + (state.cwd ? "?cwd=" + encodeURIComponent(state.cwd) : ""));
+      state.cfg = cfgRes.data;
+    } catch (e) { state.cfg = null; }
+    renderHeader();
+    renderTabs();
+    var current = state.tab || "memory";
+    var tab = tabOf(current);
+    if (!tab) tab = tabOf("memory");
+    await switchTab(tab.key);
+  }
+
   function renderHeader() {
     var s = state.status;
     var mode = $("#chip-mode");
-    mode.textContent = s.memoryTracks === "full" ? "完整记忆（五轨）" : "轻量记忆（三轨）";
+    mode.textContent = s.memoryTracks === "full" ? "全部五轨" : "只用三轨";
     mode.className = "chip ok";
-    $("#chip-tracks").textContent = "tracks: " + (s.rows || []).map(function (r) { return r.track; }).join(" / ");
-    $("#chip-preset").textContent = "preset: " + s.presetName;
+    $("#chip-tracks").textContent = "记忆轨：" + (s.rows || []).map(function (r) { return r.track; }).join(" / ");
+    $("#chip-preset").textContent = "preset：" + s.presetName;
     $("#chip-dir").textContent = s.memoryDir || "";
-    var html = '<div class="warn">⚠️ 以下文件为 § 分隔的结构化记忆，用系统工具打开后请谨慎编辑，随意修改可能破坏格式、导致记忆读取错乱。</div>';
+    var html = '<div class="warn">⚠️ 记忆文件以 § 分隔条目；用外部编辑器打开时请谨慎编辑，随意修改可能破坏格式，导致记忆读取错乱。</div>';
+    var remembered = "";
+    try { remembered = localStorage.getItem("pmc-cwd") || ""; } catch (e) {}
     if (state.cwd) {
-      html += '<div class="cwdline">当前会话工作目录：<code>' + esc(state.cwd) + '</code> <button class="mini" id="cwd-edit">修改</button></div>';
+      var fromLast = state.cwdSource === "lastCwd";
+      html += '<div class="cwdline">本页使用的工作目录：<code>' + esc(state.cwd) + '</code> '
+        + (fromLast ? '<span class="hint">（来自最近工作目录，不是当前会话）</span>' : '')
+        + ' <button class="mini" id="cwd-edit">修改</button></div>';
     } else {
-      html += '<div class="cwdline">当前会话工作目录：<input id="cwd-input" placeholder="D:\\项目路径" value="' + esc(state.cwd) + '"> <button class="mini primary" id="cwd-set">使用</button> <span class="hint">项目日志与项目关键记忆需要它，填一次会记住</span></div>';
+      html += '<div class="cwdline">本页使用的工作目录：<input id="cwd-input" placeholder="D:\\项目路径" value="' + esc(remembered) + '"> <button class="mini primary" id="cwd-set">使用</button> <span class="hint">项目日志与项目关键记忆需要它；留空则用当前会话的工作目录</span></div>';
     }
+    var cfg = state.cfg || {};
+    html += '<div class="writebar"><span>写入确认：</span>'
+      + '<label><input type="checkbox" data-direct="directMemory"' + (cfg.directMemory !== false ? " checked" : "") + '> 记忆</label>'
+      + '<label><input type="checkbox" data-direct="directUser"' + (cfg.directUser !== false ? " checked" : "") + '> 用户档案</label>'
+      + '<label><input type="checkbox" data-direct="directKey"' + (cfg.directKey !== false ? " checked" : "") + '> 关键事实</label>'
+      + '<span class="hint">勾上 = 写入直接落盘；取消 = 该轨进待确认队列（默认三轨全开）</span></div>';
     $("#notice").innerHTML = html;
+    var boxes = document.querySelectorAll("[data-direct]");
+    for (var i = 0; i < boxes.length; i++) {
+      boxes[i].addEventListener("change", async function (ev) {
+        var box = ev.target;
+        var patch = {};
+        patch[box.dataset.direct] = box.checked;
+        try {
+          await api("/api/memory-core/config", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ patch: patch }),
+          });
+          state.cfg[box.dataset.direct] = box.checked;
+          toast(box.checked ? "已改为直接写入" : "已改为进待确认队列");
+        } catch (e) {
+          box.checked = !box.checked;
+          toast("保存失败：" + e.message);
+        }
+      });
+    }
     var setBtn = $("#cwd-set");
     if (setBtn) {
       setBtn.addEventListener("click", function () {
@@ -396,6 +474,9 @@
     tabs.innerHTML = "";
     for (var i = 0; i < TABS.length; i++) {
       var t = TABS[i];
+      // lite 模式只开 memory/user/key 三条：/files 只返回这三行，项目日志与今日日志的页签也要跟着消失，
+      // 否则会出现「页签计数 0、点进去却有全文」的两种口径。
+      if (t.track && !rowOf(t.track)) continue;
       var n = 0;
       if (t.key === "pending") {
         for (var j = 0; j < state.rows.length; j++) n += state.rows[j].pending || 0;
@@ -454,14 +535,43 @@
     var base = t.archived ? t.track : t.track;
     var q = new URLSearchParams({ track: base });
     if (state.cwd) q.set("cwd", state.cwd);
-    var data = await api("/api/memory-core/entries?" + q.toString());
+    var data;
+    try { data = await api("/api/memory-core/entries?" + q.toString()); }
+    catch (e) {
+      // 失败原因不止「没填工作目录」一种：500 是文件损坏、403 是同源拦截、也可能只是断网，
+      // 一律提示去填目录会把用户带进死胡同。
+      $("#filebar").style.display = "";
+      $("#viewbar").style.display = "";
+      $("#file-title").textContent = t.title;
+      $("#file-count").textContent = "—";
+      $("#open-file").style.display = "none";
+      var msg = String(e.message || e);
+      var kind = "读取失败：" + msg;
+      if (/无法定位|工作目录|会话工作目录/.test(msg)) {
+        kind = "这一轨按项目目录分文件，先在页面上方填写工作目录，再回到本页查看。";
+        $("#file-path").textContent = "（需要会话工作目录）";
+      } else if (/HTTP 5\d\d/.test(msg)) {
+        kind = "读取失败：服务端报错（" + msg + "）。文件可能损坏或正在被占用，先确认文件能否打开。";
+        $("#file-path").textContent = "";
+      } else if (/HTTP 40[13]/.test(msg)) {
+        kind = "读取失败：请求被拒绝（" + msg + "）。刷新页面或从设置页重新打开本页。";
+        $("#file-path").textContent = "";
+      } else {
+        $("#file-path").textContent = "";
+      }
+      $("#content").innerHTML = '<div class="card"><div class="empty">' + esc(kind) + '</div>'
+        + '<div style="margin-top:8px"><button class="mini" id="tab-retry">重试</button></div></div>';
+      var retry = document.getElementById("tab-retry");
+      if (retry) retry.addEventListener("click", function () { switchTab(key); });
+      return;
+    }
     state.cache[key] = { rows: data.data, tab: t };
     $("#filebar").style.display = "";
     $("#viewbar").style.display = "";
     $("#file-title").textContent = t.title;
     $("#file-count").textContent = (t.archived ? (data.data.archived || []).length : (data.data.entries || []).length) + " 条";
     var row = rowOf(base);
-    $("#file-path").textContent = row && row.path ? row.path : "（不可用：需要会话工作目录）";
+    $("#file-path").textContent = row && row.path ? row.path : "（不可用：需要工作目录）";
     $("#open-file").style.display = row && row.path ? "" : "none";
     renderTrack();
   }
@@ -471,27 +581,30 @@
       + '<div class="card guide">'
       + '<h3>这是什么</h3>'
       + '<p>这是 <code>dsh-memory-core</code> 的管理页：给被 <code>dsh-memory-shield</code> 遮蔽的会话提供一套隔离记忆，与全局 <code>dsh-memory-evolve</code> 的存储互不影响。</p>'
-      + '<h4>五条记忆轨</h4>'
+      + '<h4>' + (state.status && state.status.memoryTracks === "full" ? "五条记忆轨" : "三条记忆轨（lite 模式）") + '</h4>'
       + '<ul>'
       + '<li><code>memory</code> 长期记忆 MEMORY.md：跨项目通用事实，每轮注入。</li>'
       + '<li><code>user</code> 用户档案 USER.md：关于用户的稳定偏好，每轮注入。</li>'
-      + '<li><code>project</code> 项目日志：按项目（工作目录哈希）记录每回合进展，不注入、按需读取。</li>'
-      + '<li><code>key</code> 项目关键记忆 KEY.md：下次会话不知道就会做错的事实，注入摘要，写入需确认。</li>'
-      + '<li><code>daily</code> 今日日志：按天记录，不注入。</li>'
+      + (state.status && state.status.memoryTracks === "full"
+        ? '<li><code>project</code> 项目日志：按项目（工作目录哈希）记录每回合进展，不注入、按需读取。</li>'
+          + '<li><code>key</code> 项目关键记忆 KEY.md：下次会话不知道就会做错的事实，注入摘要，默认直接写入。</li>'
+          + '<li><code>daily</code> 今日日志：按天记录，不注入。</li>'
+        : '<li><code>key</code> 项目关键记忆 KEY.md：下次会话不知道就会做错的事实，注入摘要，默认直接写入。</li>')
       + '</ul>'
       + '<p>lite 模式只开 memory / user / key 三条；full 模式五条全开（默认）。轨数决定「可写与可见」，不改变注入面。</p>'
       + '<h4>机制：怎么注入</h4>'
       + '<ul>'
-      + '<li>每轮把三条注入轨拼成一段快照（section <code>memory-core:snapshot</code>），总预算 <b>2,000 字符</b>；超出时保留最近的条目，从旧条目尾部截断。</li>'
+      + '<li>每轮把三条注入轨拼成一段快照（section <code>memory-core:snapshot</code>），总预算 <b>2,000 字符</b>；超出时保留最近的条目，从最旧条目的开头截断。</li>'
       + '<li>预算分配：<code>memory</code> 1,000 → <code>user</code> 600 → <code>key</code> 400，按此顺序累加，用完即停。</li>'
-      + '<li><code>key</code> 轨另有加权：先取最近 8 条，按「不要 / 必须 / 注意 / 重要 / 偏好 / 禁止 / 始终 / 永远」的命中数排序取前 5 条，再补最多 600 字符。</li>'
-      + '<li><code>project</code> 与 <code>daily</code> 不进快照，模型要用时通过 <code>memory_core</code> 的 <code>list</code> 现读。</li>'
-      + '<li>写入提醒：连续 2 个回合没写记忆，快照末尾追加一句提醒；子代理会话不提醒。</li>'
+      + '<li><code>key</code> 轨另有加权：先取最近 8 条，按「不要 / 必须 / 注意 / 重要 / 偏好 / 禁止 / 始终 / 永远」的命中数排序取前 5 条。</li>'
+      + '<li><code>project</code> 与 <code>daily</code> 不进快照，agent 要用时通过 <code>memory_core</code> 的 <code>list</code> 现读。</li>'
+      + '<li>写入提醒（在配置页开启后生效）：连续 N 个回合没写记忆，快照末尾追加一句提醒；子代理会话不提醒。</li>'
       + '</ul>'
       + '<h4>机制：怎么写</h4>'
       + '<ul>'
-      + '<li>工具是 <code>memory_core</code>，动作 <code>add / list / replace / remove / archive / promote / removeArchive / confirm / reject</code>，target 为五轨之一。</li>'
-      + '<li><code>key</code> 轨的 <code>add</code> 先进「待确认记忆建议」，在待确认页签点「允许并写入」才落盘。</li>'
+      + '<li>工具是 <code>memory_core</code>，agent 能用的动作只有 <code>add / list / replace / remove / archive</code>，target 为当前模式启用的轨（full 五轨、lite 三轨）。</li>'
+      + '<li>页面上另有 <code>promote / removeArchive / confirm / reject</code>：这几个只在管理页与接口里存在，agent 的工具列表里没有，调用会提示 unknown tool。</li>'
+      + '<li><code>key</code> 轨的 <code>add</code> 先进「待确认记忆」，在待确认页签点「允许并写入」才落盘。</li>'
       + '<li>本页可以直接新增、编辑、归档、删除，改动立即写文件；归档可逆，能从归档页签移回主轨。</li>'
       + '</ul>'
       + '<h4>机制：存在哪</h4>'
@@ -509,30 +622,48 @@
   }
 
   async function renderPending() {
+    var data;
+    var err = null;
+    try { data = await api("/api/memory-core/pending"); } catch (e) { data = null; err = e; }
+    if (err) {
+      // 读取失败不能渲染成「暂无待确认」：用户会以为队列被清空了，或者以为已经生效。
+      $("#content").innerHTML = '<div class="card"><div class="empty">读取待确认队列失败：' + esc(String(err.message || err)) + '</div>'
+        + '<div style="margin-top:8px"><button class="mini" id="pending-retry">重试</button></div></div>';
+      var retry = document.getElementById("pending-retry");
+      if (retry) retry.addEventListener("click", function () { renderPending(); });
+      return;
+    }
+    var items = (data && data.data && data.data.items) || [];
+    if (!items.length) {
+      $("#content").innerHTML = '<div class="card"><div class="empty">暂无待确认记忆。</div></div>';
+      return;
+    }
+    // 每条待确认自带写入时的 cwd，不能只依赖页面 cwd：key 轨在 full 模式下按项目目录分文件，
+    // 页面没填 cwd 时按轨查询会定位失败，表现为「明明有待确认却渲染不出来」。
+    var groups = {};
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      (groups[it.target] = groups[it.target] || []).push(it);
+    }
+    var titles = { memory: "长期记忆 MEMORY.md", user: "用户档案 USER.md", key: "项目关键记忆 KEY.md", project: "项目日志", daily: "今日日志" };
+    var order = ["memory", "user", "key", "project", "daily"];
     var html = [];
-    var total = 0;
-    for (var i = 0; i < state.rows.length; i++) {
-      var row = state.rows[i];
-      if (!row.pending) continue;
-      var q = new URLSearchParams({ track: row.track });
-      if (state.cwd) q.set("cwd", state.cwd);
-      var data;
-      try { data = await api("/api/memory-core/entries?" + q.toString()); } catch (e) { continue; }
-      var list = data.data.pending || [];
-      if (!list.length) continue;
-      total += list.length;
-      html.push('<div class="card"><h3>' + esc(row.title) + ' <span class="hint">' + list.length + ' 条</span></h3>');
+    for (var k = 0; k < order.length; k++) {
+      var t = order[k];
+      var list = groups[t];
+      if (!list || !list.length) continue;
+      html.push('<div class="card"><h3>' + esc(titles[t] || t) + ' <span class="hint">' + list.length + ' 条</span></h3>');
       for (var j = 0; j < list.length; j++) {
         var p = list[j];
         var text = p.content || p.entry || "";
+        var cw = p.cwd ? ' data-cwd="' + esc(p.cwd) + '"' : "";
         html.push('<div class="entry pending-entry"><pre>' + esc(text) + '</pre><div class="actions">');
-        html.push('<button data-op="confirm" data-track="' + esc(row.track) + '" data-entry="' + esc(text) + '" class="ok">允许并写入</button>');
-        html.push('<button data-op="reject" data-track="' + esc(row.track) + '" data-entry="' + esc(text) + '" class="danger">拒绝</button>');
+        html.push('<button data-op="confirm" data-track="' + esc(p.target) + '" data-entry="' + esc(text) + '"' + cw + ' class="ok">允许并写入</button>');
+        html.push('<button data-op="reject" data-track="' + esc(p.target) + '" data-entry="' + esc(text) + '"' + cw + ' class="danger">拒绝</button>');
         html.push('</div></div>');
       }
       html.push('</div>');
     }
-    if (!total) html.push('<div class="card"><div class="empty">暂无待确认记忆。</div></div>');
     $("#content").innerHTML = html.join("");
     bindActions();
   }
@@ -605,7 +736,14 @@
     }
 
     html.push('<div class="card"><h3>' + esc(t.title.replace(/\s+[A-Z-]+\.md$/, "")) + ' · 正式条目 <span class="hint">' + total + ' 条</span></h3>');
-    if (!pageList.length) html.push('<div class="empty">' + (state.query ? "没有匹配的条目。" : "暂无记忆条目。") + "</div>");
+    if (!pageList.length) {
+      var rowNow = (state.rows || []).filter(function (r) { return r.track === t.track; })[0];
+      var whyEmpty = rowNow && rowNow.available === false
+        ? "该轨当前不可用：需要工作目录。在页面顶部填入项目根目录的绝对路径并点「使用」。"
+        : (state.query ? "没有匹配的条目。" : "暂无记忆条目。");
+      html.push('<div class="empty">' + esc(whyEmpty) + "</div>");
+      if (rowNow && rowNow.available === false) html.push('<div class="empty" style="margin-top:6px"><button data-op="focus-cwd">去填工作目录</button></div>');
+    }
     for (var k = 0; k < pageList.length; k++) {
       var text = pageList[k];
       var date = fmtDate(text);
@@ -671,6 +809,12 @@
     var track = btn.dataset.track;
     var entry = btn.dataset.entry;
 
+    if (op === "focus-cwd") {
+      var box = document.getElementById("cwd-input");
+      if (box) { box.focus(); box.select(); box.scrollIntoView({ block: "center" }); }
+      return;
+    }
+
     if (op === "edit") {
       var div = btn.closest(".entry");
       var pre = div.querySelector("pre");
@@ -706,7 +850,7 @@
       await api("/api/memory-core/entry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: op, track: track, entry: entry, cwd: state.cwd || undefined }),
+        body: JSON.stringify({ action: op, track: track, entry: entry, cwd: btn.dataset.cwd || state.cwd || undefined }),
       });
       var msg = { archive: "已归档", delete: "已删除", confirm: "已允许并写入", reject: "已拒绝", promote: "已移回主轨", removeArchive: "已从归档删除" };
       toast(msg[op] || "完成");
@@ -731,6 +875,10 @@
     state.query = ev.target.value.trim();
     state.page = 1;
     renderTrack();
+  });
+  $("#refresh-all").addEventListener("click", async function () {
+    state.cache = {};
+    await load();
   });
   $("#copy-path").addEventListener("click", async function () {
     var p = $("#file-path").textContent;

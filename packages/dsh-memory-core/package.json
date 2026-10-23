@@ -1,6 +1,6 @@
 {
   "name": "dsh-memory-core",
-  "version": "0.1.4",
+  "version": "0.1.6",
   "description": "遮蔽会话的隔离记忆包（默认关闭：装进 profile 不会自动作用于任何会话，需在目标 preset 里挂载后才启用）。给被 dsh-memory-shield 遮蔽的会话加一套五轨独立记忆，独立数据目录，与 dsh-memory-evolve 完全隔离。",
   "type": "module",
   "main": "./index.js",

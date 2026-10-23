@@ -1,8 +1,7 @@
-# dsh bundle patch: 插入本插件，但默认关闭。
-# 本包一旦装进 profile 就会被所有会话加载（注册 memory_core 工具 + memory-core:snapshot 注入），
-# 因此默认 disabled: true，只在目标 preset 里显式启用。
-# 要用于某个 preset：在该 preset 的 plugins 里显式挂载本包，并去掉 disabled（或写 disabled: false）。
+# dsh bundle patch: 插入本插件。
+# 装配后默认不工作：memoryEnabled 未开启时 apply 直接返回，工具、注入、路由一个都不注册，
+# 所以普通会话完全不受影响，插件列表也能正常显示「已生效」。
+# 要在某个 preset 里启用：在该 preset 的 plugins 里挂载本包，并设 config.memoryEnabled: true。
 - insert:
     - id: memory-core
       name: 'dsh-memory-core'
-      disabled: true

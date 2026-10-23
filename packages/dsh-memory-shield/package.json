@@ -1,7 +1,7 @@
 {
   "name": "dsh-memory-shield",
-  "version": "0.1.11",
-  "description": "Universal memory shadow plugin for DSH: shadows other memory plugins' context and tools within a preset, giving that channel a clean context.",
+  "version": "0.1.13",
+  "description": "记忆遮蔽插件：在指定 DSH preset 内遮蔽其他记忆插件注入的上下文与工具，让该会话拿到干净上下文。默认关闭，需在目标 preset 里挂载并设置 enabled: true 才生效。",
   "type": "module",
   "main": "./index.js",
   "license": "MIT",
