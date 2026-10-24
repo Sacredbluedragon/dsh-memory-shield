@@ -2,6 +2,12 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 格式。
 
+## 0.1.14
+
+- 简介与 README 统一口径：不存记忆、只做遮蔽；默认关闭，需在目标 preset 里挂载并启用。
+- README 版本徽章跟上实际版本。
+- 无运行时改动。
+
 ## [0.1.13] - 2026-10-23
 
 ### Changed

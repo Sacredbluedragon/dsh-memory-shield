@@ -2,6 +2,8 @@
 
 遮蔽会话的隔离记忆包。与 [dsh-memory-shield (shield)](../dsh-memory-shield/) 配对使用：
 
+装完即已生效——插件列表显示「已生效」，但默认只提供管理页，不接管任何会话：`memoryEnabled` 默认 `false`。要让某个 preset 的会话真正用上这套记忆，在 preset 里设 `memoryEnabled: true`。
+
 - **shield 包**：挡住其他记忆插件（dsh-memory-evolve 等）的注入和工具，让指定 preset 的会话拥有干净的上下文。
 - **`dsh-memory-core` 包**：给被遮蔽的会话加一套隔离的记忆存储——独立数据目录、独立工具、独立面板，与普通会话的 dsh-memory-evolve 完全隔离。
 
@@ -11,12 +13,12 @@
 dsh plugin --profile web add dsh-memory-core
 ```
 
-装完默认是关闭的（包内 `cordis.patch.yml` 写了 `disabled: true`），插件列表里会显示「已关闭」——这是预期行为。：装上只是把代码放好，不会给任何会话加记忆。
+装完即已生效：插件列表显示「已生效」，但默认不接管任何会话。本包的形态是「装上只注册管理页路由，不注册记忆工具与注入」，`memoryEnabled` 默认 `false`，所以它不会给任何会话加记忆，也不会与 `dsh-memory-evolve` 抢注入。
 
 启用有两条路，推荐第一条：
 
 1. **挂进目标 preset（推荐）**：在该 preset 的 `plugins:` 里加两项（见下面「preset 挂载」），重启后新建会话即生效。数据按 presetName 分目录，不影响其他会话。
-2. 全局启用（不推荐）：把 profile 目录下 `cordis.patch.yml`（不是包内那份；包内文件升级时会被覆盖）里 `id: memory-core` 那段的 `disabled: true` 改成 `false`，重启。这样所有会话都会多一套记忆工具与注入，只在单会话环境里合适。
+2. 全局启用（不推荐）：把 profile 目录下 `cordis.patch.yml`（不是包内那份；包内文件升级时会被覆盖）里 `id: memory-core` 那段的 `disabled: true` 改成 `false`，重启。注意：即使全局加载，仍要在目标 preset 里设 `memoryEnabled: true` 才会真正接管该会话；只适合单会话环境。
 
 判断它是否真的在跑，看插件详情页有没有条数，或 `GET /api/memory-core/status` 的 `memoryTracks` 是不是五轨；不要以插件列表的开关为准，它管的是 profile 层。
 
@@ -36,6 +38,7 @@ dsh plugin --profile web add dsh-memory-core
       - id: memory-core
         name: dsh-memory-core
         config:
+          memoryEnabled: true
           presetName: <preset 名>
 ```
 
@@ -58,6 +61,7 @@ dsh plugin --profile web add dsh-memory-core
           - id: memory-core
             name: dsh-memory-core
             config:
+              memoryEnabled: true
               presetName: memory
 ```
 
@@ -69,6 +73,7 @@ dsh plugin --profile web add dsh-memory-core
 
 | 配置项 | 默认值 | 说明 |
 |---|---|---|
+| `memoryEnabled` | `false` | 是否接管该会话的记忆：`true` 才注册 `memory_core` 工具与注入；`false` 只注册管理页路由（装完不接管任何会话的形态） |
 | `memoryTracks` | `"full"` | 记忆轨模式：`full` = 五轨 memory/user/project/key/daily（默认）；`lite` = 三轨 memory/user/key |
 | `presetName` | `"default"` | preset 名称（影响数据目录落点） |
 | `memoryDir` | `""` | 记忆数据目录（留空按 `$DSH_HOME/../.dsh-plugin-data/<presetName>/memory/` 解析；`DSH_MEMORY_CORE_DIR` 优先） |

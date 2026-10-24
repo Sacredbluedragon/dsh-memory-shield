@@ -4,7 +4,7 @@
 
 它不存记忆、不提供新能力，只做遮蔽；唯一会写的文件是面板偏好 `ui-config.json`（横幅开关、提示已读标记）。
 
-![version](https://img.shields.io/badge/version-0.1.12-blue)
+![version](https://img.shields.io/badge/version-0.1.13-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 > [!IMPORTANT]

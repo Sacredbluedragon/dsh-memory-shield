@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.8
+
+- 简介与 README 改成「装完即已生效」口径：默认只提供管理页、不接管任何会话；在目标 preset 里设 `memoryEnabled: true` 才启用。
+- 无运行时改动。
+
 ## 0.1.7
 
 - 修 C6 误报：full 模式下把「HTTP 路由查不到 cwd」当成「会话没有工作目录」，横幅在每个会话都常驻。现在服务端给出 cwdSource 三态（query / session / unknown），只在明确「有会话但无 cwd」时告警。
