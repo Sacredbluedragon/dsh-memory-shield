@@ -1,6 +1,6 @@
 {
   "name": "dsh-memory-shield",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "DSH preset 记忆遮蔽插件：在指定 preset 内挡掉其他记忆插件的上下文段与工具，给会话一个干净上下文。默认关闭，需在目标 preset 里挂载并启用；不存记忆、只做遮蔽。",
   "type": "module",
   "main": "./index.js",

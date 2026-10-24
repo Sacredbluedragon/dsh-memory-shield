@@ -1,6 +1,6 @@
 {
   "name": "dsh-memory-core",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "被 dsh-memory-shield 遮蔽的会话的隔离记忆包：五轨（memory/user/project/key/daily）独立数据目录，与 dsh-memory-evolve 完全隔离。装完即已生效——默认只提供管理页，不接管任何会话；在目标 preset 里设 memoryEnabled: true 才启用。",
   "type": "module",
   "main": "./index.js",

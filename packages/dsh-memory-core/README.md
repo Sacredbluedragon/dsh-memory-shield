@@ -1,11 +1,17 @@
 # dsh-memory-core
 
-遮蔽会话的隔离记忆包。与 [dsh-memory-shield (shield)](../dsh-memory-shield/) 配对使用：
+遮蔽会话的隔离记忆包。与 [dsh-memory-shield (shield)](../dsh-memory-shield/) 配对使用。
 
-装完即已生效——插件列表显示「已生效」，但默认只提供管理页，不接管任何会话：`memoryEnabled` 默认 `false`。要让某个 preset 的会话真正用上这套记忆，在 preset 里设 `memoryEnabled: true`。
+## 它解决什么
 
-- **shield 包**：挡住其他记忆插件（dsh-memory-evolve 等）的注入和工具，让指定 preset 的会话拥有干净的上下文。
-- **`dsh-memory-core` 包**：给被遮蔽的会话加一套隔离的记忆存储——独立数据目录、独立工具、独立面板，与普通会话的 dsh-memory-evolve 完全隔离。
+想让某个 preset 的会话既有干净上下文、又有自己的记忆，但不想接入全局记忆插件时，用这两件套：
+
+- **shield 包**：遮蔽其他记忆插件（dsh-memory-evolve 等）的注入和工具，让指定 preset 的会话拥有干净的上下文。
+- **本包**：给被遮蔽的会话加一套隔离的记忆存储——独立数据目录、独立工具、独立面板，与普通会话的 dsh-memory-evolve 完全隔离。
+
+装完即已生效：插件列表显示「已生效」，但默认只提供管理页，不接管任何会话（`memoryEnabled` 默认 `false`）。要让某个 preset 的会话真正用上这套记忆，在 preset 里设 `memoryEnabled: true`。
+
+core 也可以单独挂进 preset；没有遮蔽时它只多出一套记忆，不隔离任何东西。
 
 ## 安装
 
@@ -13,16 +19,16 @@
 dsh plugin --profile web add dsh-memory-core
 ```
 
-装完即已生效：插件列表显示「已生效」，但默认不接管任何会话。本包的形态是「装上只注册管理页路由，不注册记忆工具与注入」，`memoryEnabled` 默认 `false`，所以它不会给任何会话加记忆，也不会与 `dsh-memory-evolve` 抢注入。
+装完不必立即配置：默认只注册管理页路由，不注册记忆工具与注入，所以它不会给任何会话加记忆，也不会与 `dsh-memory-evolve` 抢注入。
 
 启用有两条路，推荐第一条：
 
 1. **挂进目标 preset（推荐）**：在该 preset 的 `plugins:` 里加两项（见下面「preset 挂载」），重启后新建会话即生效。数据按 presetName 分目录，不影响其他会话。
-2. 全局启用（不推荐）：把 profile 目录下 `cordis.patch.yml`（不是包内那份；包内文件升级时会被覆盖）里 `id: memory-core` 那段的 `disabled: true` 改成 `false`，重启。注意：即使全局加载，仍要在目标 preset 里设 `memoryEnabled: true` 才会真正接管该会话；只适合单会话环境。
+2. 全局启用（不推荐）：把 profile 目录下 `cordis.patch.yml` 里 `id: memory-core` 那段的 `disabled: true` 改成 `false`，再重启。注意两件事：一、包内那份 patch 升级时会被覆盖，不要改它；二、即使全局加载，仍要在目标 preset 里设 `memoryEnabled: true` 才会接管该会话，所以这条只适合单会话环境。
 
-判断它是否真的在跑，看插件详情页有没有条数，或 `GET /api/memory-core/status` 的 `memoryTracks` 是不是五轨；不要以插件列表的开关为准，它管的是 profile 层。
+判断它是否在跑，看插件详情页有没有条数，或 `GET /api/memory-core/status` 的 `memoryTracks` 是不是五轨。不要以插件列表的开关为准，那管的是 profile 层。
 
-> **别同时开两处**：如果你已经用 preset 挂载了本包，就不要再打开插件列表上的开关——两个实例会抢同一个 `/api/memory-core` 路由，后挂载的那个 preset 会报 `duplicate prefix route` 并整体加载失败。真遇到了：把列表开关关掉、重启，数据不会丢。
+> **别同时开两处**：已经用 preset 挂载了本包，就不要再打开插件列表上的开关。两个实例会抢同一个 `/api/memory-core` 路由，后挂载的那个 preset 会报 `duplicate prefix route` 并整体加载失败。若遇到：把列表开关关掉、重启，数据不会丢。
 
 ## preset 挂载
 
@@ -65,9 +71,11 @@ dsh plugin --profile web add dsh-memory-core
               presetName: memory
 ```
 
-`presetName` 决定数据落点，默认值是字面量 `"default"`（不是当前 preset 的名）：`$DSH_HOME/../.dsh-plugin-data/default/memory/`（`DSH_HOME` 在 `~/.dsh` 时就是 `~/.dsh-plugin-data/default/memory/`；也可用环境变量 `DSH_MEMORY_CORE_DIR` 直接指定）。**多个 preset 不显式配置 `presetName` 会共用这一个目录，隔离不成立**，所以每个挂载点都应写自己的 `presetName`（建议与 preset 的 `id` 一致）。改它等于换一个空目录，旧记忆不会自动搬过去，也不报错。
+`presetName` 决定数据落点。默认值是字面量 `"default"`，不是当前 preset 的名字，落点为 `$DSH_HOME/../.dsh-plugin-data/default/memory/`（`DSH_HOME` 在 `~/.dsh` 时即 `~/.dsh-plugin-data/default/memory/`）。也可以用环境变量 `DSH_MEMORY_CORE_DIR` 直接指定。
 
-前提：通常与 `dsh-memory-shield` 配对使用（shield 负责遮蔽，core 提供隔离记忆）；core 也可以独立挂进 preset，只是没有遮蔽时它只多出一套记忆，不会隔离任何东西。两包配对时建议只把 `dsh-memory-core` 挂进需要独立记忆的那个 preset，不要放进全局 `dsh.profile.bundles`。
+**多个 preset 不写 `presetName` 会共用这一个目录，隔离不成立**，所以每个挂载点都应写自己的值（建议与 preset 的 `id` 一致）。改它会换成另一个空目录，旧记忆不会自动搬过去，也不报错。
+
+通常与 `dsh-memory-shield` 配对使用：shield 负责遮蔽，core 提供隔离记忆。配对时只把 `dsh-memory-core` 挂进需要独立记忆的那个 preset，不要放进全局 `dsh.profile.bundles`。
 
 ## 配置
 
@@ -82,7 +90,7 @@ dsh plugin --profile web add dsh-memory-core
 | `writeGuardThreshold` | `2` | 看门狗阈值：连续 N 轮没写记忆就提醒 |
 | `snapshotOrder` | `500` | memory-core:snapshot 注入顺序 |
 
-上面几项都可以在插件详情页的「配置」页签里改，落点是一份覆盖层 `~/.dsh-plugin-data/<presetName>/memory-core.config.json`，每轮重读，改完立即生效（`snapshotOrder` 这种注册期属性除外，要重启）。
+上面几项可以在插件详情页的「配置」页签里改，改动写进覆盖层 `~/.dsh-plugin-data/<presetName>/memory-core.config.json`，每轮重读，改完立即生效。`snapshotOrder` 属于注册期属性，要重启才生效。
 
 ## 记忆轨
 
@@ -127,9 +135,23 @@ memory_core action=archive target=user match="要归档的子串"
 
 - 本包的存储层（`lib/store.js`）**参考并借鉴了 [dsh-memory-evolve](https://github.com/csyangwen/dsh-memory-evolve)**（作者 csyangwen）的实现，做了隔离适配：数据目录独立、工具名独立、注入 section 同名（`memory-core:snapshot`）但内容是自己的。
 - 普通会话的 dsh-memory-evolve 面板看不到遮蔽会话的记忆，反之亦然。
-- 如果用户想要完整的五轨记忆 + 待确认审查 + 合并梳理，可以在普通会话里装 dsh-memory-evolve，本包只负责给被遮蔽的会话提供基础记忆读写能力。
+- 普通会话继续用 dsh-memory-evolve（它带审阅与合并梳理）；本包只服务被遮蔽的会话，功能面刻意更小。
 
-## 目录结构
+## 限制
+
+- 遮蔽与注入都依赖内核的「同作用域同名覆盖」规则；内核若改成先注册者赢，这套机制失效。
+- 同一时刻只能有一个实例接管 `/api/memory-core` 路由；profile 与 preset 同时开会给后加载者报 `duplicate prefix route`。
+- `presetName` 不显式配置时，多个 preset 共用 `default` 目录，隔离不成立。
+
+## 自测
+
+源码仓库里有 `_dryrun.mjs`（不随 npm 包发布）。它用纯内存 stub 模拟宿主与 HTTP，不落盘、不碰真实的 `DSH_HOME`：
+
+```bash
+node _dryrun.mjs
+```
+
+## 项目结构
 
 ```
 packages/dsh-memory-core/
@@ -150,6 +172,6 @@ packages/dsh-memory-core/
     └── entryid.js    # 条目身份证
 ```
 
-## License
+## 许可
 
 MIT

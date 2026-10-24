@@ -1,10 +1,10 @@
 # dsh-memory-shield
 
-在指定 DSH preset 里挡掉其他记忆插件的上下文段与工具，让那个会话拿到干净上下文。
+在指定 DSH preset 里遮蔽其他记忆插件的上下文段与工具，让那个会话拿到干净上下文。
 
 它不存记忆、不提供新能力，只做遮蔽；唯一会写的文件是面板偏好 `ui-config.json`（横幅开关、提示已读标记）。
 
-![version](https://img.shields.io/badge/version-0.1.13-blue)
+![version](https://img.shields.io/badge/version-0.1.14-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 > [!IMPORTANT]
@@ -16,7 +16,7 @@
 
 装了记忆插件（memory-evolve、prime-memory、auto-memory 等）之后，它们会把记忆注入到挂载它们的会话。某些 preset 不该吃这些注入，应该有自己独立的上下文。
 
-这个插件在指定 preset 里用同名覆盖挡住这些注入和工具，其他插件本体不动。
+这个插件在指定 preset 里用同名覆盖遮蔽这些注入和工具，其他插件本体不动。
 
 ## 安装
 
@@ -55,7 +55,7 @@ dsh plugin --profile web add dsh-memory-shield
 
 改完重启，或新建一个选择该 preset 的会话。
 
-**为什么不在 profile 层启用**：同名遮蔽会在本作用域注册 22 个空工具和 10 个空 context。全局启用会让每个会话都吃到这些空桩，还会和全局记忆插件撞名（报 `prompt context "memory:snapshot" is already registered`）。放在 preset 里，影响面只有那一个通道。
+**为什么不在 profile 层启用**：同名遮蔽会在本作用域注册 22 个空工具和 10 个空 context。放进 preset，影响面只有那一个通道；放到全局，每个会话都会吃到这些空桩，还会与全局记忆插件撞名，报 `prompt context "memory:snapshot" is already registered`。
 
 ## 配置
 
@@ -83,7 +83,7 @@ dsh plugin --profile web add dsh-memory-shield
 
 **改名单注意**：在 `cordis.patch.yml` 里写 `shadowTools` / `shadowSections` 会整块替换默认值，不深合并。要加名字，先把默认名单抄出来再追加。
 
-## 挡不住的
+## 遮蔽不到的部分
 
 - **消息级注入**：部分插件（如 meow-memory）往消息流里插独立快照消息，不是 context section，同名遮蔽管不到。
 - **pre-step user message 注入**：openviking-memory 这类插件在 `agent/pre-step` 里注入 user message，不经过 `systemPrompt.context`。
